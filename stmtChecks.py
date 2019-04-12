@@ -56,17 +56,17 @@ Types of Stmt:
 #=======================ERROR Functions============================================
 
 def typeError(stmt):
-   print("Type error found: Line - {}".format(stmt["line"]))
+   print("Type error found: Line - {}\n".format(stmt["line"]))
 
 def funcError(stmt):
-   print("Func error found:\n\tLine - {}\n\tFunc: {}".format(stmt["line"], stmt["id"]))
+   print("Func error found:\n\tLine - {}\n\tFunc: {}\n".format(stmt["line"], stmt["id"]))
 
 def argCountError(stmt, actual, given):
    print("Incorrect number of arguments error found:\n\tLine: {}\n\t\
-         args needed: {}\n\targs given: {}".format(stmt["line"], actual, given))
+         args needed: {}\n\targs given: {}\n".format(stmt["line"], actual, given))
 
 def guardError(stmt):
-   print("Guard error found:\n\tLine: {}\n\t".format(stmt["line"]))
+   print("Guard error found:\n\tLine: {}\n".format(stmt["line"]))
 
 
 #====================================================================================
@@ -83,13 +83,13 @@ def checkReturn(syms, funcs, structs, stmt, func):
 
 def checkIf(syms, funcs, structs, stmt, func):
    guardType = lookupExpType(syms, funcs, structs, stmt["guard"])
-   if guardType is not "bool":
+   if guardType != "bool":
       guardError(stmt)
 
    checkStmt(syms, funcs, structs, stmt["then"], func)
    
    elseStmt = stmt.get("else")
-   if elseStmt is not None:
+   if elseStmt != None:
       checkStmt(syms, funcs, structs, elseStmt, func)
 
 def checkBlock(syms, funcs, structs, stmt, func):
@@ -106,7 +106,7 @@ def checkAssign(syms, funcs, structs, stmt, func):
    #tarType = vd.lookupType(syms, tarId)
    #sourceType = vd.lookupExpType(syms, funcs, structs, stmt)
    tarType = lookupType(syms, tarId)
-   sourceType = lookupExpType(syms, funcs, structs, stmt)
+   sourceType = lookupExpType(syms, funcs, structs, stmt["source"])
 
    if checkTypes(tarType, sourceType):
       typeError(stmt)
@@ -118,7 +118,7 @@ def checkPrint(syms, funcs, structs, stmt, func):
 def checkWhile(syms, funcs, structs, stmt, func):
    guardType = lookupExpType(syms, funcs, structs, stmt["guard"])
 
-   if guardType is not "bool":
+   if guardType != "bool":
       guardError(stmt)
 
    checkStmt(syms, funcs, structs, stmt["body"], func)
@@ -126,19 +126,25 @@ def checkWhile(syms, funcs, structs, stmt, func):
 
 
 def checkInvocation(syms, funcs, structs, stmt):
+   #print(stmt)
+   #print("\n")
    if stmt["id"] not in funcs:
       funcError(stmt)
       return
 
-   argsStmts = stmt["args"]
-   paramStmts = funcs[stmt["id"]]["paramaters"]
+   argStmts = stmt["args"]
+   #print(argStmts)
+   paramStmts = funcs[stmt["id"]]["parameters"]
 
-   if len(argStmts) is not len(paramStmts):
+   if len(argStmts) != len(paramStmts):
       argCountError(stmt, len(paramStmts), len(argStmts))
       return
 
    for i in range(len(argStmts)):
+      #print(argStmts[i])
+      #print("\n")
       argType = lookupExpType(syms, funcs, structs, argStmts[i])
+      #print("argType checked")
       paramType = paramStmts[i]["type"]
       
       if not checkTypes(argType, paramType):
@@ -146,33 +152,34 @@ def checkInvocation(syms, funcs, structs, stmt):
 
 
 def checkStmt(syms, funcs, structs, stmt, func):
-   if stmt["stmt"] is "return":
+   if stmt["stmt"] == "return":
       checkReturn(syms, funcs, structs, stmt, func)
 
-   elif stmt["stmt"] is "if":
+   elif stmt["stmt"] == "if":
       checkIf(syms, funcs, structs, stmt, func)
 
-   elif stmt["stmt"] is "block":
+   elif stmt["stmt"] == "block":
       checkBlock(syms, funcs, structs, stmt, func)
 
-   elif stmt["stmt"] is "assign":
+   elif stmt["stmt"] == "assign":
       checkAssign(syms, funcs, structs, stmt, func)
 
-   elif stmt["stmt"] is "print":
+   elif stmt["stmt"] == "print":
       checkPrint(syms, funcs, structs, stmt, func)
 
-   elif stmt["stmt"] is "while":
+   elif stmt["stmt"] == "while":
       checkWhile(syms, funcs, structs, stmt, func)
 
-   elif stmt["stmt"] is "invocation":
+   elif stmt["stmt"] == "invocation":
       checkInvocation(syms, funcs, structs, stmt)
+      return
 
 
 
 #check if two types are equivalent or null
 def checkTypes(t1, t2):
    if t1 is not t2:
-      if t1 is "null" or t2 is "null":
+      if t1 == "null" or t2 == "null":
          return True
       return False
    return True
@@ -189,42 +196,42 @@ def lookupType(syms, varID):
 def lookupExpType(syms, funcs, structs, stmt):
    exp = stmt["exp"]
 
-   if exp is "num":
+   if exp == "num":
       return "int"
 
-   elif exp is "binary":
+   elif exp == "binary":
       #TODO typeCheck binary expression here
-      op = exp["operator"]
+      op = stmt["operator"]
       if op in ("+", "-", "/", "*", "%"):
          return "int"
       elif op in ("<", ">", "<=", ">="):
          return "bool"
 
-   elif exp is "id":
+   elif exp == "id":
       return lookupType(syms, stmt["id"])
 
-   elif type(exp) is type(dict()):
+   elif type(exp) == type(dict()):
       #TODO evaluate whats in the dictionary block
       return None
 
-   elif exp is "invocation":
+   elif exp == "invocation":
       #TODO check func params here
-      checkInvocation(syms, funcs, structs, exp)
+      checkInvocation(syms, funcs, structs, stmt)
       return funcs[stmt["id"]]["return_type"]
 
-   elif exp is "dot":
+   elif exp == "dot":
       #TODO check that field is a part of the lhs var
       return None
 
-   elif exp is "null":
+   elif exp == "null":
       return "null"
 
-   elif exp is "true":
+   elif exp == "true":
       return "bool"
 
-   elif exp is "false":
+   elif exp == "false":
       return "bool"
    
-   elif exp is "new":
+   elif exp == "new":
       return stmt["id"]
 

@@ -87,7 +87,9 @@ def checkFuncs(prog, symTable, structTable, funTable):
    #provides a local copy of the symTable for each function
    for func in prog["functions"]:
       symTableCpy = symTable.copy()
-      print("Checking function: {}\n".format(func["id"]))
+      print("==========================")
+      print("Checking function: {}".format(func["id"]))
+      print("==========================\n")
       checkFunc(func, symTableCpy, structTable, funTable)
 
 def createJson():
