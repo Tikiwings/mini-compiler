@@ -49,6 +49,7 @@ Types of Stmt:
       -true
       -false
       -new
+      -unary
 
    
 '''
@@ -75,7 +76,14 @@ def guardError(stmt):
 
 def checkReturn(syms, funcs, structs, stmt, func):
    retType = func["return_type"]
-   expType = lookupExpType(syms, funcs, structs, stmt)
+   if stmt.get("exp") != None:
+      expType = lookupExpType(syms, funcs, structs, stmt["exp"])
+   else:
+      expType = None
+
+   #print("return type: {}".format(retType))
+   #print("expType: {}\n".format(expType))
+   #print("expType: {}\n\tFrom Stmt: {}".format(expType, stmt))
 
    if not checkTypes(retType, expType):
       typeError(stmt)
@@ -86,6 +94,7 @@ def checkIf(syms, funcs, structs, stmt, func):
    if guardType != "bool":
       guardError(stmt)
 
+   #print("Then statement: {}".format(stmt["then"]))
    checkStmt(syms, funcs, structs, stmt["then"], func)
    
    elseStmt = stmt.get("else")
@@ -108,7 +117,7 @@ def checkAssign(syms, funcs, structs, stmt, func):
    tarType = lookupType(syms, tarId)
    sourceType = lookupExpType(syms, funcs, structs, stmt["source"])
 
-   if checkTypes(tarType, sourceType):
+   if not checkTypes(tarType, sourceType):
       typeError(stmt)
 
 
@@ -147,6 +156,8 @@ def checkInvocation(syms, funcs, structs, stmt):
       #print("argType checked")
       paramType = paramStmts[i]["type"]
       
+      #print("argType: {}".format(argType))
+      #print("paramType: {}".format(paramType))
       if not checkTypes(argType, paramType):
          typeError(stmt)
 
@@ -178,11 +189,20 @@ def checkStmt(syms, funcs, structs, stmt, func):
 
 #check if two types are equivalent or null
 def checkTypes(t1, t2):
-   if t1 is not t2:
+   #print("type1: {}".format(ascii(t1)))
+   #print("type2: {}".format(ascii(t2)))
+   if t1 == t2:
+      return True
+   if t1 == "null" or t2 == "null":
+      return True
+   return False
+   '''
+   if t1 != t2:
       if t1 == "null" or t2 == "null":
          return True
       return False
    return True
+   '''
 
 #lookup varID in symTable to find what type it is 
 #and if it exists
@@ -235,3 +255,6 @@ def lookupExpType(syms, funcs, structs, stmt):
    elif exp == "new":
       return stmt["id"]
 
+   elif exp == "unary":
+      return lookupExpType(syms, funcs, structs, stmt["operand"])
+      
