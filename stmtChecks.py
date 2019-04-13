@@ -57,10 +57,10 @@ Types of Stmt:
 #=======================ERROR Functions============================================
 
 def typeError(stmt):
-   print("Type error found: Line - {}\n".format(stmt["line"]))
+   print("Type error found: Line: {}\n".format(stmt["line"]))
 
 def funcError(stmt):
-   print("Func error found:\n\tLine - {}\n\tFunc: {}\n".format(stmt["line"], stmt["id"]))
+   print("Func error found:\n\tLine: {}\n\tFunc: {}\n".format(stmt["line"], stmt["id"]))
 
 def argCountError(stmt, actual, given):
    print("Incorrect number of arguments error found:\n\tLine: {}\n\t\
@@ -68,6 +68,9 @@ def argCountError(stmt, actual, given):
 
 def guardError(stmt):
    print("Guard error found:\n\tLine: {}\n".format(stmt["line"]))
+
+def binaryError(stmt):
+   print("Binary error found:\n\tLine: {}".format(stmt["line"]))
 
 
 #====================================================================================
@@ -161,6 +164,19 @@ def checkInvocation(syms, funcs, structs, stmt):
       if not checkTypes(argType, paramType):
          typeError(stmt)
 
+def checkBinary(syms, funcs, structs, stmt):
+   lhsType = lookupExpType(syms, funcs, structs, stmt["lft"])
+   rhsType = lookupExpType(syms, funcs, structs, stmt["rht"])
+   op = stmt["operator"]
+   badTypes = ("bool", "null")
+
+   if not checkTypes(lhsType, rhsType)\
+         or lhsType in badTypes\
+         or rhsType in badTypes:
+      typeError(stmt)
+
+
+
 
 def checkStmt(syms, funcs, structs, stmt, func):
    if stmt["stmt"] == "return":
@@ -221,6 +237,7 @@ def lookupExpType(syms, funcs, structs, stmt):
 
    elif exp == "binary":
       #TODO typeCheck binary expression here
+      checkBinary(syms, funcs, structs, stmt)
       op = stmt["operator"]
       if op in ("+", "-", "/", "*", "%"):
          return "int"
