@@ -17,9 +17,17 @@ def getGlobalDecls(prog, symTable):
    for ID in prog["declarations"]:
       addDecl(symTable, ID)
 
+
+##################################################################################
 #Error functions
 def redeclError(dup):
    print("Redeclration error\n\tline:{}\n\tid:{}\n".format(dup["line"], dup["id"]))
+
+def returnError(funcId):
+   print("Return error in func: {} not return equivalent\n".format(funcId))
+
+##################################################################################
+
 
 #check if main is present. Exit if not
 def checkForMain(funList):
@@ -29,6 +37,75 @@ def checkForMain(funList):
          mainExist = True
          #print("main found")
    return mainExist
+
+
+def checkIfReturns(ifStmt):
+   thenReturn = False
+   elseReturn = False
+
+   thenStmt = ifStmt.get("then")
+   elseStmt = ifStmt.get("else")
+
+   if thenStmt:
+      for stmt in thenStmt["list"]:
+         if stmt["stmt"] == "if":
+            thenReturn = checkIfReturns(stmt)
+
+         elif stmt["stmt"] == "while":
+            thenReturn = checkWhileReturns(stmt)
+
+         elif stmt["stmt"] == "return":
+            thenReturn = True
+      
+   if elseStmt:
+      for stmt in elseStmt["list"]:
+         if stmt["stmt"] == "if":
+            elseReturn = checkIfReturns(stmt)
+
+         elif stmt["stmt"] == "while":
+            elseReturn = checkWhileReturns(stmt)
+
+         elif stmt["stmt"] == "return":
+            elseReturn = True
+   
+   if elseStmt:
+      if thenReturn and elseReturn:
+         return True
+      else:
+         return False
+   else:
+      return thenReturn
+
+
+
+def checkWhileReturns(whileStmt):
+   for stmt in whileStmt["body"]["list"]:
+      if stmt["stmt"] == "if":
+         if checkIfReturns(stmt):
+            return True
+
+      elif stmt["stmt"] == "while":
+         if checkWhileReturns(stmt):
+            return True
+
+      elif stmt["stmt"] == "return":
+         return True
+   return False
+
+def checkReturns(func):
+   for stmt in func["body"]:
+      if stmt["stmt"] == "if":
+         if checkIfReturns(stmt):
+            return True
+
+      elif stmt["stmt"] == "while":
+         if checkWhileReturns(stmt):
+            return True
+
+      elif stmt["stmt"] == "return":
+         return True
+   return False
+
 
 
 #check if checkMe is a duplication declrations in the current
@@ -44,6 +121,7 @@ def checkDups(decls, checkMe):
 #attempt to add decl by checking sym table
 #for an existing id
 def addDecl(table, decl):
+   #TODO allow for new declarations to overwrite globals
    '''
    dup = checkDups(symTable, decl)
    if dup is None:
@@ -57,6 +135,7 @@ def addDecl(table, decl):
    else:
       redeclError(decl)
 
+
 #check and validate a function in the program
 def checkFunc(func, symTable, structTable, funTable):
    for param in func["parameters"]:
@@ -65,6 +144,10 @@ def checkFunc(func, symTable, structTable, funTable):
    for decl in func["declarations"]:
       addDecl(symTable, decl)
       #symTable.append(decl)
+
+   if func.get("return_type") != None:
+      if not checkReturns(func):
+         returnError(func.get("id"))
 
    for stmt in func["body"]:
       #st.checkStmt(syms, funcs, structs, stmt)
@@ -99,13 +182,13 @@ def createJson():
    return progFile
 
 def main():
-   symTable = {}
+   symTable = {"__global__" : {}}
    structTable = {}
    funTable = {}
    progFile = createJson()
 
    makeStructTable(progFile, structTable)
-   getGlobalDecls(progFile, symTable)
+   getGlobalDecls(progFile, symTable["__global__"])
    checkFuncs(progFile, symTable, structTable, funTable)
 
    #print(structTable)

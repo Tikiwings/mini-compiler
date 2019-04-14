@@ -42,9 +42,11 @@ Types of Stmt:
       -num
       -binary
       -id
-      -{}
+      -{} -> exp
       -invocation
       -dot
+         -left
+         -id 
       -null
       -true
       -false
@@ -72,6 +74,9 @@ def guardError(stmt):
 def binaryError(stmt):
    print("Binary error found:\n\tLine: {}".format(stmt["line"]))
 
+def structError(left, fieldId, errMsg, stmt):
+   print("Struct error found: ({})\n\tLine: {}\n \
+         Left: {}\n\t\t\tField: {}\n".format(errMsg, stmt["line"], left["id"], fieldId))
 
 #====================================================================================
 
@@ -99,9 +104,10 @@ def checkIf(syms, funcs, structs, stmt, func):
 
    #print("Then statement: {}".format(stmt["then"]))
    checkStmt(syms, funcs, structs, stmt["then"], func)
-   
+   #print(stmt["then"]) 
    elseStmt = stmt.get("else")
    if elseStmt != None:
+      #print(elseStmt)
       checkStmt(syms, funcs, structs, elseStmt, func)
 
 def checkBlock(syms, funcs, structs, stmt, func):
@@ -125,6 +131,8 @@ def checkAssign(syms, funcs, structs, stmt, func):
 
 
 def checkPrint(syms, funcs, structs, stmt, func):
+   expType = lookupExpType(syms, funcs, structs, stmt)
+
    return None
 
 def checkWhile(syms, funcs, structs, stmt, func):
@@ -176,7 +184,55 @@ def checkBinary(syms, funcs, structs, stmt):
       typeError(stmt)
 
 
+def checkField(structs, structType, fieldId):
+   struct = structs.get(structType)
+   if struct == None:
+      #print(structs)
+      #print(structType)
+      return "StructNotFound", None
+   
+   for field in struct["fields"]:
+      if fieldId == field["id"]:
+         return "FieldFound", field["type"]
 
+   return "FieldNotFound", None
+
+
+
+def checkDot(syms, funcs, structs, stmt):
+   #format: exp.fieldId.fieldId...
+   exp = stmt
+   dotIds = list()
+
+   #Iterate through all dot operator id's used
+   #and push them onto a list based stack
+   dotIds.append(exp.get("id"))
+   #print(exp["id"])
+   while exp["left"]["exp"] == "dot":
+      exp = exp["left"]
+      #print(exp["id"])
+      dotIds.append(exp["id"])
+   
+   #Push the farthest left exp onto the stack
+   dotIds.append(exp["left"]["id"])
+   #print(dotIds)
+
+   #
+   #print(dotIds)
+   fieldId = dotIds.pop()
+   fieldType = lookupType(syms, fieldId)
+   #fieldType = None
+   #print(fieldId)
+   #print(fieldType)
+   #print(stmt)
+   while dotIds:
+      left = fieldId
+      fieldId = dotIds.pop()
+      errMsg, fieldType = checkField(structs, fieldType, fieldId)
+      if errMsg != "FieldFound":
+         structError(left, fieldId, errMsg, stmt)
+         return None
+   return fieldType
 
 def checkStmt(syms, funcs, structs, stmt, func):
    if stmt["stmt"] == "return":
@@ -225,8 +281,9 @@ def checkTypes(t1, t2):
 def lookupType(syms, varID):
    if varID in syms:
       return syms[varID]["type"]
-   else:
-      return None
+   elif varID in syms["__global__"]:
+      return syms["__global__"][varID]["type"]
+   return None
 
 #lookup what type an exp equates to
 def lookupExpType(syms, funcs, structs, stmt):
@@ -258,7 +315,10 @@ def lookupExpType(syms, funcs, structs, stmt):
 
    elif exp == "dot":
       #TODO check that field is a part of the lhs var
-      return None
+      #return value is the type of the initial field
+      #ie. f.a.a.i type of the field i will be returned
+      return checkDot(syms, funcs, structs, stmt)
+      
 
    elif exp == "null":
       return "null"
