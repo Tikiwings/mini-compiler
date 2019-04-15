@@ -93,6 +93,9 @@ def checkWhileReturns(whileStmt):
    return False
 
 def checkReturns(func):
+   if func["return_type"] == "void":
+      return True
+
    for stmt in func["body"]:
       if stmt["stmt"] == "if":
          if checkIfReturns(stmt):

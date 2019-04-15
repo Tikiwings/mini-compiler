@@ -76,7 +76,10 @@ def binaryError(stmt):
 
 def structError(left, fieldId, errMsg, stmt):
    print("Struct error found: ({})\n\tLine: {}\n \
-         Left: {}\n\t\t\tField: {}\n".format(errMsg, stmt["line"], left["id"], fieldId))
+         Left: {}\n\t\t\tField: {}\n".format(errMsg, stmt.get("line"), left.get("id"), fieldId))
+
+def printError(stmt):
+   print("Print error found: (Not an int)\n\tLine: {}\n".format(stmt["line"]))
 
 #====================================================================================
 
@@ -131,8 +134,12 @@ def checkAssign(syms, funcs, structs, stmt, func):
 
 
 def checkPrint(syms, funcs, structs, stmt, func):
+   #TODO
    expType = lookupExpType(syms, funcs, structs, stmt)
-
+   #print(stmt)
+   #print(expType)
+   if expType != "int":
+      printError(stmt)
    return None
 
 def checkWhile(syms, funcs, structs, stmt, func):
@@ -192,7 +199,8 @@ def checkField(structs, structType, fieldId):
       return "StructNotFound", None
    
    for field in struct["fields"]:
-      if fieldId == field["id"]:
+      #if fieldId == field["id"]:
+      if fieldId["id"] == field["id"]:
          return "FieldFound", field["type"]
 
    return "FieldNotFound", None
@@ -206,21 +214,24 @@ def checkDot(syms, funcs, structs, stmt):
 
    #Iterate through all dot operator id's used
    #and push them onto a list based stack
-   dotIds.append(exp.get("id"))
+   #dotIds.append(exp.get("id"))
+   dotIds.append(exp)
    #print(exp["id"])
    while exp["left"]["exp"] == "dot":
       exp = exp["left"]
       #print(exp["id"])
-      dotIds.append(exp["id"])
+      dotIds.append(exp)
    
    #Push the farthest left exp onto the stack
-   dotIds.append(exp["left"]["id"])
+   #dotIds.append(exp["left"]["id"])
+   dotIds.append(exp["left"])
    #print(dotIds)
 
    #
    #print(dotIds)
    fieldId = dotIds.pop()
-   fieldType = lookupType(syms, fieldId)
+   #fieldType = lookupType(syms, fieldId)
+   fieldType = lookupExpType(syms, funcs, structs, fieldId)
    #fieldType = None
    #print(fieldId)
    #print(fieldType)
@@ -230,7 +241,8 @@ def checkDot(syms, funcs, structs, stmt):
       fieldId = dotIds.pop()
       errMsg, fieldType = checkField(structs, fieldType, fieldId)
       if errMsg != "FieldFound":
-         structError(left, fieldId, errMsg, stmt)
+         #print(fieldType)
+         structError(left, fieldId["id"], errMsg, stmt)
          return None
    return fieldType
 
@@ -306,7 +318,7 @@ def lookupExpType(syms, funcs, structs, stmt):
 
    elif type(exp) == type(dict()):
       #TODO evaluate whats in the dictionary block
-      return None
+      return lookupExpType(syms, funcs, structs, exp)
 
    elif exp == "invocation":
       #TODO check func params here
