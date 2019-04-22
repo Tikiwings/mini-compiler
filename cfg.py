@@ -9,7 +9,7 @@ class ProgramCfgs:
 
    def printProg(self):
       for cfg in self.funcCfgs:
-         print(" CFG =======================================")
+         print("CFG of function \" =========================================")
          cfg.printCfg()
          print("\n\n")
 
@@ -143,7 +143,7 @@ def addBlock(body, currBlock, exit, label):
          whileBlock.preds.append(currBlock)
          #whileBlock.succrs.append(whileBlock)
          #whileBlock.succrs.append(joinBlock)
-         labelCount = addBlock(stmt["body"], whileBlock, joinBlock,
+         labelCount = addBlock([stmt["body"]], whileBlock, joinBlock,
                labelCount + 2)
          
          # add guard at end of while block to determine which successor follows
