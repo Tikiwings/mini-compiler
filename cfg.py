@@ -9,18 +9,18 @@ class ProgramCfgs:
 
    def printProg(self):
       for cfg in self.funcCfgs:
-         print("CFG of function \" =========================================")
+         print("CFG =========================================")
          cfg.printCfg()
          print("\n\n")
 
 
 class Cfg:
    def __init__(self, label):
-      self.entry = BlockNode(label)
-      self.exit = BlockNode(label + 1)
+      self.entry = BlockNode(label, "CFGEntry")
+      self.exit = BlockNode(label + 1, "CFGExit")
 
    def printCfg(self):
-      self.entry.printBlock()
+      self.entry.printBlock(1)
 
    
 # Every block contains:
@@ -29,22 +29,54 @@ class Cfg:
 #   list of predecessors
 #   Label
 class BlockNode:
-   def __init__(self, label):
+   def __init__(self, label, blockType):
       self.instrs = []
       self.succrs = []
       self.preds = []
       self.label = label
+      self.blockType = blockType
+      self.visited = False
 
-   def printBlock(self):
-      print("Label "+str(self.label)+"==================")
-      print("Instructions:")
-      print(self.instrs)
-      print("\nLabel "+str(self.label)+" successors:")
-      for successor in self.succrs:
-         successor.printBlock()
-      print("\nLabel "+str(self.label)+" predecessors:")
+
+   def printBlock(self, indentDepth):
+      if self.visited:
+         return
+
+      self.visited = True
+      #printedBlocks = []
+
+      #if indentDepth > 6:
+      #   return
+
+      print(" "*indentDepth*3+ "Label "+str(self.label)+" "+
+            str(self.blockType)+"="*10)
+      
+      # Instructions
+      print(" "*indentDepth*3+ "Instructions:")
+      print(" "*indentDepth*3+ str(self.instrs))
+      
+      # Succrs
+      print(" "*indentDepth*3+ "Successors:")
+      for succr in self.succrs:
+         print(" "*(indentDepth+1)*3+ "Label "+str(succr.label)+" "+
+               str(succr.blockType)+",")
+
+         #if successor not in printedBlocks:
+         #   successor.printBlock(indentDepth + 1)
+         #printedBlocks.append(successor)
+         #print(printedBlocks)
+      
+      # Predecessors
+      print(" "*indentDepth*3+ "Predecessors:")
       for pred in self.preds:
-         print("Label "+str(pred.label)+",")
+         print(" "*(indentDepth+1)*3+ "Label "+str(pred.label)+" "+
+               str(pred.blockType)+",")
+      
+      # Print successor blocks
+      for successor in self.succrs:
+         print()
+         successor.printBlock(indentDepth + 1)
+
       print()
 
 def buildProg(jsonProg): 
@@ -89,8 +121,8 @@ def addBlock(body, currBlock, exit, label):
          # add guard expression to current block
          currBlock.instrs.append(stmt["guard"])
 
-         thenEntry = BlockNode(labelCount)
-         thenExit = BlockNode(labelCount + 1)
+         thenEntry = BlockNode(labelCount, "ThenEntry")
+         thenExit = BlockNode(labelCount + 1, "ThenExit")
 
          # update preds and successors for current block and then entry
          thenEntry.preds.append(currBlock)
@@ -101,7 +133,7 @@ def addBlock(body, currBlock, exit, label):
                labelCount + 2)
          
          # create Join Block aka Exit Node for if statement
-         joinBlock = BlockNode(labelCount)
+         joinBlock = BlockNode(labelCount, "IfElseJoin")
          labelCount += 1
 
          # update preds&succcrs for thenExit and join block
@@ -109,8 +141,8 @@ def addBlock(body, currBlock, exit, label):
          joinBlock.preds.append(thenExit)
 
          if "else" in stmt:
-            elseEntry = BlockNode(labelCount)
-            elseExit = BlockNode(labelCount + 1)
+            elseEntry = BlockNode(labelCount, "ElseEntry")
+            elseExit = BlockNode(labelCount + 1, "ElseExit")
 
             # update preds and successors for current block and else entry
             elseEntry.preds.append(currBlock)
@@ -134,8 +166,8 @@ def addBlock(body, currBlock, exit, label):
          # add guard expression to current block
          currBlock.instrs.append(stmt["guard"])
 
-         whileBlock = BlockNode(labelCount)
-         joinBlock = BlockNode(labelCount + 1)
+         whileBlock = BlockNode(labelCount, "While")
+         joinBlock = BlockNode(labelCount + 1, "WhileJoin")
 
          # update succrs for current block
          currBlock.succrs.append(whileBlock)
@@ -164,7 +196,7 @@ def addBlock(body, currBlock, exit, label):
       elif stmtType == "block":
          # add instructions from block statement into the current block
          # also add an exit node for block statement so that shit makes sense
-         blockExit = BlockNode(labelCount)
+         blockExit = BlockNode(labelCount, "BlockStmtExit")
          addBlock(stmt["list"], currBlock, blockExit, labelCount + 1)
          currBlock = blockExit
       else:  # print, assign, invocation
