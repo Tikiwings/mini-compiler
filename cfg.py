@@ -48,35 +48,62 @@ class BlockNode:
 
       self.visited = True
 
-      print(" "*indentDepth*3+ "Label "+str(self.label)+" "+
-            str(self.blockType)+"="*10)
+      printIndent(indentDepth)
+      print("Label " + str(self.label) + " " + str(self.blockType)+"="*10)
       
       # Instructions
-      print(" "*indentDepth*3+ "Instructions:")
-      print(" "*indentDepth*3+ str(self.instrs))
+      printIndent(indentDepth+1)
+      print("Instructions:")
+      printIndent(indentDepth+1)
+      print(self.instrs)
+      #print(" "*indentDepth*3+ str(self.instrs))
       
       # Succrs
-      print(" "*indentDepth*3+ "Successors:")
+      printIndent(indentDepth+1)
+      print("Successors:")
       if len(self.succrs) == 0:
-         print(" "*(indentDepth+1)*3+ "None")
+         printIndent(indentDepth+2)
+         print("None")
+         #print(" "*(indentDepth+1)*3+ "None")
       else:
          for succr in self.succrs:
-            print(" "*(indentDepth+1)*3+ "Label "+str(succr.label)+" "+
-                  str(succr.blockType)+",")
+            printIndent(indentDepth+2)
+            print("Label " + str(succr.label)+" "+str(succr.blockType)+",")
+            #print(" "*(indentDepth+1)*3+ "Label "+str(succr.label)+" "+
+            #      str(succr.blockType)+",")
 
       # Predecessors
-      print(" "*indentDepth*3+ "Predecessors:")
+      printIndent(indentDepth+1)
+      print("Predecessors:")
       if len(self.preds) == 0:
-         print(" "*(indentDepth+1)*3+ "None")
+         printIndent(indentDepth+2)
+         print("None")
+         #print(" "*(indentDepth+1)*3+ "None")
       else:
          for pred in self.preds:
-            print(" "*(indentDepth+1)*3+ "Label "+str(pred.label)+" "+
-                  str(pred.blockType)+",")
+            printIndent(indentDepth+2)
+            print("Label " + str(pred.label)+" "+str(pred.blockType)+",")
+            #print(" "*(indentDepth+1)*3+ "Label "+str(pred.label)+" "+
+            #      str(pred.blockType)+",")
       
       # Print successor blocks
+      printIndent(indentDepth+1)
+      print("Successors to Block " + str(self.label))
       for successor in self.succrs:
-         print()
-         successor.printBlock(indentDepth + 1)
+         #printIndent(indentDepth+1)
+         #print("Successors to Block" + str(self.label))
+         #print(" "*indentDepth*3+ "Successors to Block " + str(self.label))
+
+         successor.printBlock(indentDepth + 2)
+         
+         #printIndent(indentDepth+1)
+         #print("End of Successors to Block " + str(self.label))
+         #print(" "*indentDepth*3+ "End of Successors to Block "
+         #      +str(self.label))
+      printIndent(indentDepth+1)
+      print("End of Successors to Block " + str(self.label))
+
+
 
       print()
 
@@ -208,3 +235,5 @@ def addBlock(body, currBlock, exit, label):
    return labelCount
 
 
+def printIndent(indentDepth):
+   print("|  " * (indentDepth - 1), end = "")
