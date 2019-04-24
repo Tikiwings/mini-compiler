@@ -2,22 +2,26 @@
 
 
 class ProgramCfgs:
-   def __init__(self):
-      self.types = []
-      self.decls = []
+   def __init__(self, jsonProg):
+      self.types = jsonProg["types"]
+      self.decls = jsonProg["declarations"]
       self.funcCfgs = []
 
    def printProg(self):
       for cfg in self.funcCfgs:
-         print("CFG =========================================")
+         print("CFG for function \""+cfg.funcName+"\" " + "=" * 25)
          cfg.printCfg()
          print("\n\n")
 
 
 class Cfg:
-   def __init__(self, label):
+   def __init__(self, label, func):
       self.entry = BlockNode(label, "CFGEntry")
       self.exit = BlockNode(label + 1, "CFGExit")
+      self.params = func["parameters"]
+      self.localDecls = func["declarations"]
+      self.funcName = func["id"]
+      self.returnType = func["return_type"]
 
    def printCfg(self):
       self.entry.printBlock(1)
@@ -43,10 +47,6 @@ class BlockNode:
          return
 
       self.visited = True
-      #printedBlocks = []
-
-      #if indentDepth > 6:
-      #   return
 
       print(" "*indentDepth*3+ "Label "+str(self.label)+" "+
             str(self.blockType)+"="*10)
@@ -57,20 +57,21 @@ class BlockNode:
       
       # Succrs
       print(" "*indentDepth*3+ "Successors:")
-      for succr in self.succrs:
-         print(" "*(indentDepth+1)*3+ "Label "+str(succr.label)+" "+
-               str(succr.blockType)+",")
+      if len(self.succrs) == 0:
+         print(" "*(indentDepth+1)*3+ "None")
+      else:
+         for succr in self.succrs:
+            print(" "*(indentDepth+1)*3+ "Label "+str(succr.label)+" "+
+                  str(succr.blockType)+",")
 
-         #if successor not in printedBlocks:
-         #   successor.printBlock(indentDepth + 1)
-         #printedBlocks.append(successor)
-         #print(printedBlocks)
-      
       # Predecessors
       print(" "*indentDepth*3+ "Predecessors:")
-      for pred in self.preds:
-         print(" "*(indentDepth+1)*3+ "Label "+str(pred.label)+" "+
-               str(pred.blockType)+",")
+      if len(self.preds) == 0:
+         print(" "*(indentDepth+1)*3+ "None")
+      else:
+         for pred in self.preds:
+            print(" "*(indentDepth+1)*3+ "Label "+str(pred.label)+" "+
+                  str(pred.blockType)+",")
       
       # Print successor blocks
       for successor in self.succrs:
@@ -80,11 +81,8 @@ class BlockNode:
       print()
 
 def buildProg(jsonProg): 
-   returnProg = ProgramCfgs()
+   returnProg = ProgramCfgs(jsonProg)
    labelCount = 0
-
-   returnProg.types = jsonProg["types"]
-   returnProg.decls = jsonProg["declarations"]
 
    for func in jsonProg["functions"]:
       funcCfgAndLabel = createCfg(func, labelCount)
@@ -95,7 +93,7 @@ def buildProg(jsonProg):
 
 
 def createCfg(func, labelCount):
-   returnCfg = Cfg(labelCount)
+   returnCfg = Cfg(labelCount, func)
    returnLabCnt = labelCount + 2
    
    currBlock = returnCfg.entry
