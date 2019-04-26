@@ -4,6 +4,7 @@ import sys
 #import stmtChecks as st
 from stmtChecks import lookupType, lookupExpType, checkStmt
 from cfg import buildProg
+from llvmTranslator import translateProg
 
 types = ("int", "bool", "struct id")
 
@@ -197,7 +198,9 @@ def main():
 
    #print(structTable)
    #print(symTable)
-   buildProg(progFile)
+   progCfg = buildProg(progFile)
+   progCfg.printProg()
+   translateProg(progCfg)
    ''' for x,y in progFile.items():
       for p in progFile[x]:
          print(p)

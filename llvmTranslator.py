@@ -65,7 +65,8 @@ Misc:
    *null
 
 """
-
+#global register counter
+regLabel = 1
 
 def transArith():
    return ""
@@ -95,6 +96,7 @@ def lookUpInstType(instr):
    #elif invocation
    #elif allocation
    #elif misc
+   return None
 
 
 def translateInstr():
@@ -112,3 +114,37 @@ def translateInstr():
    #else:
       #ERROR instrType doesn't exist
    return None
+
+"""
+programCfg
+   types
+   decls
+   funcCfgs
+      [cfg ...]
+"""
+
+
+def translateProg(progCfg):
+   #print(progCfg.funcCfgs)
+   progFuncs = {}
+   
+   for cfg in progCfgs.funcCfgs:
+      progFuncs.add(cfg.funcName, funcLlvm(cfg.funcName, cfg.returnType, cfg.params))
+
+   return None
+
+class funcLlvm:
+   def __init__(self, funcId, retType, parms):
+      self.header = f"define {lookupLlvmType(retType)} @{funcId}({lookupParamTypes(params)})"
+      self.openBlock = "{"
+      self.instrs = []
+      self.closeBlock = "}"
+
+   def __str__(self):
+      print(self.header)
+      print(self.openBlock)
+      for instr in self.instrs:
+         print(instr)
+      print(self.closeBlock)
+
+
