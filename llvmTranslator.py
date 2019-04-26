@@ -67,6 +67,7 @@ Misc:
 """
 #global register counter
 regLabel = 0
+labelDecls = {}
 
 def transArith():
    return ""
@@ -98,28 +99,67 @@ def lookUpInstType(instr):
    #elif misc
    return None
 
+"""
+   connor
+   -load
+   -store
+   -branching
 
+   donnie
+   -invocation
+   -boolean
+   -arithmetic
+"""
+#return list of instruction strings
 def translateInstr():
    #instrType = lookupInstrType(instr)
 
    #if instrType == "arithmetic":
+
    #elif instrType == "boolean":
    #elif instrType == "comparison":
+
    #elif instrType == "branching":
    #elif instrType == "load":
    #elif instrType == "store":
    #elif instrType == "invocation":
+
    #elif instrType == "allocation":
    #elif instrType == "misc":
    #else:
       #ERROR instrType doesn't exist
    return None
 
-def translateInstrs(cfg):
+def getNextRegLabel():
    global regLabel
+   retReg = regLabel
+   regLabel += 1
+   return retReg
+
+#add decl to a given labels/blocks regTable
+def addLabelDecl(label, regName, value=0 ):
+   global labelDecls
+   if !labelDecls.get(label):
+      labelDecls[label] = dict()
+
+   labelDecls[label][regName] = value
+
+#lookup registers from a given label/block
+def lookupLabelDecl(label, regName):
+   global labelDecls
+   if !labelDecls.get(label):
+      return None
+   return labelDecls[label].get(regName)
+
+def translateInstrs(cfg):
    instrs = []
    instrs.append(f"L{cfg.entry.label}:")
    
+   #inital allocations for function
+   if cfg.returnType != "void":
+      instrs.append(f"%_retval_ = alloca {lookupLlvmType(cfg.returnType)}")
+      
+
    for param in cfg.params:
       instrs.append(f"%_P_{param['id']} = alloca {lookupLlvmType(param['type']}")
    for param in cfg.params:
@@ -128,7 +168,11 @@ def translateInstrs(cfg):
       instrs.append(f"store {llvmType} %{paramId}, {llvmType}* %_P_{paramId}")
 
    #TODO finish translating rest of the blocks instructions and each successor block 
-
+   #iterate through all instructions
+   for instr in instrs:
+      #llvmInstrs = translateInstr(instr)
+      #for llvmInstr in llvmInstrs:
+         #instrs.append(llvmInstr)
    return instrs
 
 """
@@ -140,6 +184,7 @@ programCfg
 """
 
 def lookupLlvmType(llvmType):
+   #TODO add in type for structs
    if llvmType == "int":
       return "i32"
    elif llvmType == "bool":
