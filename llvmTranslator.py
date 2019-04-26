@@ -66,7 +66,7 @@ Misc:
 
 """
 #global register counter
-regLabel = 1
+regLabel = 0
 
 def transArith():
    return ""
@@ -115,6 +115,22 @@ def translateInstr():
       #ERROR instrType doesn't exist
    return None
 
+def translateInstrs(cfg):
+   global regLabel
+   instrs = []
+   instrs.append(f"L{cfg.entry.label}:")
+   
+   for param in cfg.params:
+      instrs.append(f"%_P_{param['id']} = alloca {lookupLlvmType(param['type']}")
+   for param in cfg.params:
+      llvmType = lookupLlvmType(param['type'])
+      paramId = param['id']
+      instrs.append(f"store {llvmType} %{paramId}, {llvmType}* %_P_{paramId}")
+
+   #TODO finish translating rest of the blocks instructions and each successor block 
+
+   return instrs
+
 """
 programCfg
    types
@@ -123,28 +139,58 @@ programCfg
       [cfg ...]
 """
 
+def lookupLlvmType(llvmType):
+   if llvmType == "int":
+      return "i32"
+   elif llvmType == "bool":
+      return "i32"
+   elif llvmType == "void":
+      return "void"
+   else:
+      return "i32"
+
+def lookupParamTypes(params):
+   paramTable = {}
+   
+   for param in params:
+      paramTable.add(param['id'], lookupLlvmType(param['type']))
+   """
+   paramStrs = []
+
+   for param in params:
+      paramStrs.append(f"{param['type']} %{param['id']}")
+
+   formattedParamStr = ""
+   for paramStr in paramStrs:
+      formattedParamStr += paramStr + ","
+   #remove trailing comma
+   return formattedParamStr[:len(formattedParamStr) - 1]
+   """
 
 def translateProg(progCfg):
    #print(progCfg.funcCfgs)
    progFuncs = {}
    
    for cfg in progCfgs.funcCfgs:
-      progFuncs.add(cfg.funcName, funcLlvm(cfg.funcName, cfg.returnType, cfg.params))
+      progFuncs.add(cfg.funcName, funcLlvm(cfg))
 
-   return None
+   return progFuncs
 
 class funcLlvm:
-   def __init__(self, funcId, retType, parms):
-      self.header = f"define {lookupLlvmType(retType)} @{funcId}({lookupParamTypes(params)})"
-      self.openBlock = "{"
-      self.instrs = []
-      self.closeBlock = "}"
-
+   def __init__(self, cfg):
+      #self.header = f"define {lookupLlvmType(retType)} @{funcId}({lookupParamTypes(params)})"
+      self.funcId = cfg.funcName
+      self.retType = lookupLlvmType(cfg.returnType)
+      self.params = lookupParamTypes(cfg.params)
+      #self.openBlock = "{"
+      self.instrs = translateInstrs(cfg)
+      #self.closeBlock = "}"
+   """
    def __str__(self):
       print(self.header)
       print(self.openBlock)
       for instr in self.instrs:
          print(instr)
       print(self.closeBlock)
-
+   """
 
