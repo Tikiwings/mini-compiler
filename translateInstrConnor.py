@@ -42,8 +42,11 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls):
                               f"%struct.{instr['source']['id']}*")
       
       elif instr["source"]["exp"] == "dot":
-         # TODO: add instructions for loading from struct field
-         pass
+         structPtrReg = getStructFieldReg(llvmInstrList, mapping, 
+                                          instr["source"], decls, types)
+         sourceReg = loadFromStructField(llvmInstrList, 
+                             lookupLlvmType(instr["source"], decls, types),
+                             structPtrReg)
 
       # TODO: make compatible with cases for other types of source expressions 
 
