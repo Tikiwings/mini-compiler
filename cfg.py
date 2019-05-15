@@ -144,7 +144,7 @@ def addBlock(body, currBlock, exit, label):
       elif stmtType == "if":
          
          # add guard expression to current block
-         currBlock.instrs.append(stmt["guard"])
+         currBlock.instrs.append({"guard" : stmt["guard"]})
 
          thenEntry = BlockNode(labelCount, "ThenEntry")
          thenExit = BlockNode(labelCount + 1, "ThenExit")
@@ -189,7 +189,8 @@ def addBlock(body, currBlock, exit, label):
          currBlock = joinBlock
       elif stmtType == "while":
          # add guard expression to current block
-         currBlock.instrs.append(stmt["guard"])
+         """currBlock.instrs.append(stmt["guard"])"""
+         currBlock.instrs.append({"guard" : stmt["guard"]})
 
          whileBlock = BlockNode(labelCount, "While")
          joinBlock = BlockNode(labelCount + 1, "WhileJoin")
@@ -204,7 +205,8 @@ def addBlock(body, currBlock, exit, label):
                labelCount + 2)
          
          # add guard at end of while block to determine which successor follows
-         whileBlock.instrs.append(stmt["guard"])
+         """whileBlock.instrs.append(stmt["guard"])"""
+         whileBlock.instrs.append({"guard" : stmt["guard"]})
 
          # update preds&succrs
          joinBlock.preds.append(currBlock)
