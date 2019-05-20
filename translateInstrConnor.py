@@ -12,48 +12,18 @@ def getNextRegLabel():
 def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls):
    # check if guard for if/else or while statement
    if "guard" in instr:
-      # TODO: add branching instructions
-      
+      transBrInstr(instr["guard"], llvmInstrList, currBlock, mapping)
+      # Break out of guard translation
       return
-
+    
+   ###################################################
+   # Not a guard expression
    instrStmt = instr["stmt"]
 
    if instrStmt == "assign":
       ###################################################
       # translate source
-      sourceReg = -1
-      
-      if instr["source"]["exp"] == "new":
-         # Get number of fields
-         fieldCount = -1
-         for typ in types:
-            if instr["source"]["id"] == typ["id"]:
-               fieldCount = len(typ["fields"])
-         if fieldCount == -1:
-            print("transInstr error: Tried to create new " +
-                  f"{instr['source']['id']}, but not in types.")
-         
-         mallocReg = getNextRegLabel()
-         llvmInstrList.append(f"%u{mallocReg} = call i8* " +
-                              f"@malloc(i32 {fieldCount})")
-         sourceReg = getNextRegLabel()
-         llvmInstrList.append(f"%u{sourceReg} = bitcast i8* " + 
-                              f"%u{mallocReg} to " + 
-                              f"%struct.{instr['source']['id']}*")
-      
-      elif instr["source"]["exp"] == "dot":
-         structPtrReg = getStructFieldReg(llvmInstrList, mapping, 
-                                          instr["source"], decls, types)
-         sourceReg = loadFromStructField(llvmInstrList, 
-                             lookupLlvmType(instr["source"], decls, types),
-                             structPtrReg)
-
-      # TODO: make compatible with cases for other types of source expressions 
-
-
-      if sourceReg == -1:
-         print("transInstr error: source register unknown")
-
+      sourceReg = getExpReg(instr["source"], llvmInstrList, mapping)
 
       ###################################################
       # translate target
@@ -61,11 +31,114 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls):
          targetType = lookupLlvmType(instr["target"], decls, types)
          targetReg = getStructFieldReg(llvmInstrList, mapping, target, decls,
                                        types)
-         llvmInstrList.append(f"store {targetType} %u{sourceReg}, " +
+         llvmInstrList.append(f"store {targetType} {sourceReg}, " +
                               f"{targetType}* {targetReg}")
       else: # update mapping
          targetId = instr["target"]["id"]
-         mapping[targetId] = targetReg
+         mapping[targetId] = sourceReg
+
+   elif instrStmt == "delete":
+      #TODO: delete statement
+      pass
+   elif instrStmt == "return":
+      #TODO: return
+      pass
+   else:
+      print(f"transInstr err: Unrecognized statement '{instrStmt}' in instr:" +
+            f"\n{instr}")
+
+
+def transBrInstr(guard, llvmInstrList, currBlock, idToRegMap, decls, types):
+   if len(currBlock.succrs) < 2:
+      print("transInstr err: Cannot evaluate branch instruction. Too few" +
+            f" successors to current block when evaluating guard {guard}")
+   #llvmInstrList.append(guardEvalInstr)
+   guardEvalReg = getExpReg(guard, llvmInstrList, idToRegMap, decls, types)
+   llvmInstrList.append(f"br i1 {guardEvalReg}, label "+
+                        f"%LU{currBlock.succrs[0].label}, label "+
+                        f"%LU{currBlock.succrs[1].label}")
+
+
+# returns either the register of the identifier or expression, or the
+#   immediate value
+# exp types: id, num, binary, new, dot, invocation, read
+def getExpReg(expr, llvmInstrList, idToRegMap, decls, types):
+   if expr["exp"] == "id":  # identifier
+      return idToRegMap[expr["id"]]
+   if expr["exp"] == "num":  # immediate
+      return expr["value"]
+   
+   resultReg = f"%u{getNextRegLabel()}"
+   llvmInstr = resultReg + " = "
+   if expr["exp"] == "binary":  # binary expr with a left and right side
+      operator = expr["operator"]
+      # eq, ne, sgt, sge, slt, sle
+      if operator == "<=":
+         llvmInstr += "icmp sle i32 "
+      elif operator == ">=":
+         llvmInstr += "icmp sge i32 "
+      elif operator == ">":
+         llvmInstr += "icmp sgt i32 "
+      elif operator == "<":
+         llvmInstr += "icmp slt i32 "
+      elif operator == "==":
+         llvmInstr += "icmp eq i32 "
+      elif operator == "!=":
+         llvmInstr += "icmp ne i32 "
+      elif operator == "-":
+         llvmInstr += "add i32 "
+      elif operator == "+":
+         llvmInstr += "sub i32 "
+      elif operator == "*":
+         llvmInstr += "mul i32 "
+      elif operator == "/":
+         llvmInstr += "sdiv i32 "
+      else:
+         print("getExpReg error: Unknown or unaccounted operator: '" +
+               operator + "'")
+         print(f"in expression: {expr}")
+
+      leftSide = getExpReg(expr["lft"], llvmInstrList, idToRegMap)
+      rightSide = getExpReg(expr["rht"], llvmInstrList, idToRegMap)
+      llvmInstr += (leftSide + ", " + rightSide)
+      llvmInstrList.append(llvmInstr)
+   elif expr["exp"] == "new":
+      # Get number of fields
+      fieldCount = -1
+      for typ in types:
+         if expr["id"] == typ["id"]:
+            fieldCount = len(typ["fields"])
+      if fieldCount == -1:
+         print("getExpReg error: Tried to create new " +
+               f"{expr['id']}, but not in types.")
+         
+      mallocReg = getNextRegLabel()
+      llvmInstrList.append(f"%u{mallocReg} = call i8* " +
+                           f"@malloc(i32 {fieldCount})")
+      resultReg = getNextRegLabel()
+      llvmInstrList.append(f"%u{resultReg} = bitcast i8* " + 
+                           f"%u{mallocReg} to " + 
+                           f"%struct.{expr['id']}*")
+      
+
+   elif expr["exp"] == "dot":
+      structPtrReg = getStructFieldReg(llvmInstrList, idToRegMap, expr, 
+                                       decls, types)
+      resultReg = loadFromStructField(llvmInstrList, 
+                         lookupLlvmType(expr, decls, types),
+                         structPtrReg)
+
+   elif expr["exp"] == "invocation":
+      # TODO: invocation
+
+   elif expr["exp"] == "read":
+      # TODO: read
+
+   else:
+      print("getExpReg error: Unrecognized expression type '" + expr["exp"] +
+            f"' in expression: {expr}")
+
+   return resultReg
 
 
 def lookupLlvmType(target, decls, types):
@@ -109,7 +182,7 @@ def getStructFieldReg(llvmInstrList, mapping, target, decls, types,
                       withLoad = False):
    leftStructType = lookupStructType(target["left"], decls, types)
    leftStructLlvmType = lookupLlvmType(target["left"], decls, types)
-   rightType = lookupStructType(target, decls, types)
+   #rightType = lookupStructType(target, decls, types)
    rightLlvmType = lookupLlvmType(target, decls, types)
    fieldReg = -1
    if "left" in target["left"]:
