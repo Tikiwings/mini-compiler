@@ -9,6 +9,8 @@ def getNextRegLabel():
 # mapping -- a dictionary that maps string to int. Used to map identifiers to registers
 # types -- the list of types declared at the beginning of the json file
 # decls -- the list of global and local declarations for the function
+# TODO: change arguments of function to match how we handle declarations
+#       and types
 def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls):
    # check if guard for if/else or while statement
    if "guard" in instr:
@@ -23,7 +25,8 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls):
    if instrStmt == "assign":
       ###################################################
       # translate source
-      sourceReg = getExpReg(instr["source"], llvmInstrList, mapping)
+      sourceReg = getExpReg(instr["source"], llvmInstrList, mapping, 
+                            decls, types)
 
       ###################################################
       # translate target
@@ -31,6 +34,7 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls):
          targetType = lookupLlvmType(instr["target"], decls, types)
          targetReg = getStructFieldReg(llvmInstrList, mapping, target, decls,
                                        types)
+         
          llvmInstrList.append(f"store {targetType} {sourceReg}, " +
                               f"{targetType}* {targetReg}")
       else: # update mapping
@@ -38,8 +42,14 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls):
          mapping[targetId] = sourceReg
 
    elif instrStmt == "delete":
-      #TODO: delete statement
-      pass
+      sourceReg = getExpReg(instr["exp"], llvmInstrList, mapping, 
+                            decls, types)
+      sourceType = lookupLlvmType(instr["exp"], decls, types)
+      bitcastReg = f"%u{getNextRegLabel()}"
+      
+      llvmInstrList.append(bitcastReg + f" = bitcast {sourceType} " +
+                           f"{sourceReg} to i8*")
+      llvmInstrList.append(f"call void @free(i8* {bitcastReg})")
    elif instrStmt == "return":
       #TODO: return
       pass
@@ -66,11 +76,11 @@ def getExpReg(expr, llvmInstrList, idToRegMap, decls, types):
    if expr["exp"] == "id":  # identifier
       return idToRegMap[expr["id"]]
    if expr["exp"] == "num":  # immediate
-      return expr["value"]
-   
-   resultReg = f"%u{getNextRegLabel()}"
-   llvmInstr = resultReg + " = "
+      return expr["value"] 
    if expr["exp"] == "binary":  # binary expr with a left and right side
+      resultReg = f"%u{getNextRegLabel()}"
+      llvmInstr = resultReg + " = "
+
       operator = expr["operator"]
       # eq, ne, sgt, sge, slt, sle
       if operator == "<=":
@@ -115,8 +125,8 @@ def getExpReg(expr, llvmInstrList, idToRegMap, decls, types):
       mallocReg = getNextRegLabel()
       llvmInstrList.append(f"%u{mallocReg} = call i8* " +
                            f"@malloc(i32 {fieldCount})")
-      resultReg = getNextRegLabel()
-      llvmInstrList.append(f"%u{resultReg} = bitcast i8* " + 
+      resultReg = f"%u{getNextRegLabel()}"
+      llvmInstrList.append(f"{resultReg} = bitcast i8* " + 
                            f"%u{mallocReg} to " + 
                            f"%struct.{expr['id']}*")
       
@@ -124,16 +134,19 @@ def getExpReg(expr, llvmInstrList, idToRegMap, decls, types):
    elif expr["exp"] == "dot":
       structPtrReg = getStructFieldReg(llvmInstrList, idToRegMap, expr, 
                                        decls, types)
-      resultReg = loadFromStructField(llvmInstrList, 
-                         lookupLlvmType(expr, decls, types),
-                         structPtrReg)
+      resultReg = "%u" + str(loadFromStructField(llvmInstrList, 
+                                 lookupLlvmType(expr, decls, types),
+                                 structPtrReg))
 
    elif expr["exp"] == "invocation":
       # TODO: invocation
 
    elif expr["exp"] == "read":
-      # TODO: read
-
+      llvmInstrList.append("call i32 (i8*, ...)* @scanf(i8* getelementptr " +
+                           "inbounds([4 x i8]* @.read, i32 0, i32 0), " +
+                           "i32* @.read_scratch)")
+      resultReg = f"%u{getNextRegLabel()}"
+      llvmInstrList.append(f"{resultReg} = load i32* @.read_scratch")
    else:
       print("getExpReg error: Unrecognized expression type '" + expr["exp"] +
             f"' in expression: {expr}")
