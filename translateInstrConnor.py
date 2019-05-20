@@ -52,7 +52,17 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls):
       llvmInstrList.append(f"call void @free(i8* {bitcastReg})")
    elif instrStmt == "return":
       #TODO: return
-      pass
+      if len(currBlock.succrs) == 0: # current block is function exit node
+         if "exp" not in instr:
+            llvmInstrList.append("ret void")
+         else:
+            sourceType = lookupLlvmType(instr["exp"], decls, types)
+            sourceReg = getExpReg(instr["exp"], llvmInstrList, mapping,
+                                  decls, types)
+            llvmInstrList.append(f"ret {sourceType} {sourceReg}")
+      else: # return statement in the middle of cfg
+         # TODO: handle return statements in middle of cfg
+         pass
    else:
       print(f"transInstr err: Unrecognized statement '{instrStmt}' in instr:" +
             f"\n{instr}")
