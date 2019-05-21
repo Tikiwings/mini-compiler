@@ -200,7 +200,28 @@ def main():
    #print(symTable)
    progCfg = buildProg(progFile)
    progCfg.printProg()
-   translateProg(progCfg)
+   progFuncs = translateProg(progCfg)
+
+   print("#####################################")
+   print("###########Llvm Prog#################")
+   print("#####################################")
+   for func in progFuncs.keys():
+      print(f"define {progFuncs[func].retType} @{progFuncs[func].funcId}({progFuncs[func].params})")
+      print("{")
+      for instr in progFuncs[func].instrs:
+         if instr == "<PHI placeholder>":
+            print(f"    <PHI placeholder found>")
+         else:
+            print(f"    {instr}")
+      print("}\n")
+   print(f"""declare i8* @malloc(i32)
+declare void @free(i8*)
+declare i32 @printf(i8*, ...)
+declare i32 @scanf(i8*, ...)
+@.println = private unnamed_addr constant [5 x i8] c"%ld\\0A\\00", align 1
+@.print = private unnamed_addr constant [5 x i8] c"%ld \\00", align 1
+@.read = private unnamed_addr constant [4 x i8] c"%ld\\00", align 1
+@.read_scratch = common global i32 0, align 4""")
    ''' for x,y in progFile.items():
       for p in progFile[x]:
          print(p)
