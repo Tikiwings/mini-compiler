@@ -269,11 +269,24 @@ def translateInstr(instr, cfg, llvmInstrs):
    if instrType == "arithmetic":
          return transArith(instr, cfg, llvmInstrs)
 
-   elif instrType == "boolean":
-      pass
-
    elif instrType == "comparison":
       return transCmp(instr, cfg, llvmInstrs)
+
+   elif instrType == "invocation":
+      return transInvoc(instr, cfg, llvmInstrs)
+
+   elif instrType == "num":
+      return instr['value']
+
+   elif instrType == "null":
+      return "null"
+
+   else:
+      pass
+      #pass the instruction to connors translation
+   """
+   elif instrType == "boolean":
+      pass
 
    elif instrType == "branching":
       pass
@@ -284,23 +297,17 @@ def translateInstr(instr, cfg, llvmInstrs):
    elif instrType == "store":
       pass
 
-   elif instrType == "invocation":
-      return transInvoc(instr, cfg, llvmInstrs)
-
    elif instrType == "allocation":
       pass
 
-   elif instrType == "num":
-      return instr['value']
-
-   elif instrType == "null":
-      return "null"
 
    elif instrType == "misc":
       pass
-
+   
    else:
       print(f"ERROR instrType {instrType} doesn't exist: instr: {instr}")
+   
+   """
 
    return None
 
