@@ -1,10 +1,11 @@
-
+from llvmTranslator import getNextRegLabel 
+"""
 def getNextRegLabel():
    global regLabel
    retReg = regLabel
    regLabel += 1
    return retReg
-
+"""
 
 # mapping -- a dictionary that maps string to int. Used to map identifiers to registers
 # types -- the list of types declared at the beginning of the json file
@@ -84,7 +85,7 @@ def transBrInstr(guard, llvmInstrList, currBlock, idToRegMap, decls, types):
 # exp types: id, num, binary, new, dot, invocation, read
 def getExpReg(expr, llvmInstrList, idToRegMap, decls, types):
    if expr["exp"] == "id":  # identifier
-      return idToRegMap[expr["id"]]
+      return idToRegMap.get(expr["id"])
    if expr["exp"] == "num":  # immediate
       return expr["value"] 
    if expr["exp"] == "binary":  # binary expr with a left and right side
@@ -252,7 +253,7 @@ def getStructFieldReg(llvmInstrList, mapping, target, decls, types,
 
          llvmInstrList.append(f"%u{fieldReg} = getelementptr " +
                               f"{leftStructLlvmType} " +
-                              f"%u{mapping[target['left']['id']]}, " +
+                              f"%u{mapping.get(target['left']['id'])}, " +
                               f"i1 0, i32 {fieldNum}")
 
    return fieldReg
