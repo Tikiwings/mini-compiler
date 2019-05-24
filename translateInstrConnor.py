@@ -1,4 +1,4 @@
-from llvmTranslator import getNextRegLabel 
+import llvmTranslator
 
 
 # mapping -- a dictionary that maps string to int. Used to map identifiers to registers
@@ -7,6 +7,11 @@ from llvmTranslator import getNextRegLabel
 # TODO: change arguments of function to match how we handle declarations
 #       and types
 def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls):
+   # Insert return instruction if at the cfg exit block
+   if len(curBlock.succrs) == 0:
+      retInstr = "ret "
+
+   
    # check if guard for if/else or while statement
    if "guard" in instr:
       transBrInstr(instr["guard"], llvmInstrList, currBlock, mapping)
@@ -40,24 +45,22 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls):
       sourceReg = getExpReg(instr["exp"], llvmInstrList, mapping, 
                             decls, types)
       sourceType = lookupLlvmType(instr["exp"], decls, types)
-      bitcastReg = f"%u{getNextRegLabel()}"
+      bitcastReg = f"%u{llvmTranslator.getNextRegLabel()}"
       
       llvmInstrList.append(bitcastReg + f" = bitcast {sourceType} " +
                            f"{sourceReg} to i8*")
       llvmInstrList.append(f"call void @free(i8* {bitcastReg})")
    elif instrStmt == "return":
       #TODO: return
-      if len(currBlock.succrs) == 0: # current block is function exit node
-         if "exp" not in instr:
-            llvmInstrList.append("ret void")
-         else:
-            sourceType = lookupLlvmType(instr["exp"], decls, types)
-            sourceReg = getExpReg(instr["exp"], llvmInstrList, mapping,
+      if "exp" not in instr:
+         llvmInstrList.append("ret void")
+      else:
+         sourceType = lookupLlvmType(instr["exp"], decls, types)
+         sourceReg = getExpReg(instr["exp"], llvmInstrList, mapping,
                                   decls, types)
-            llvmInstrList.append(f"ret {sourceType} {sourceReg}")
-      else: # return statement in the middle of cfg
-         # TODO: handle return statements in middle of cfg
-         pass
+         llvmInstrList.append(f"ret {sourceType} {sourceReg}")
+
+
    elif instrStmt == "invocation":
       """
       argList = []
@@ -103,7 +106,7 @@ def getExpReg(expr, llvmInstrList, idToRegMap, decls, types):
    if expr["exp"] == "num":  # immediate
       return expr["value"] 
    if expr["exp"] == "binary":  # binary expr with a left and right side
-      resultReg = f"%u{getNextRegLabel()}"
+      resultReg = f"%u{llvmTranslator.getNextRegLabel()}"
       llvmInstr = resultReg + " = "
 
       operator = expr["operator"]
@@ -147,10 +150,10 @@ def getExpReg(expr, llvmInstrList, idToRegMap, decls, types):
          print("getExpReg error: Tried to create new " +
                f"{expr['id']}, but not in types.")
          
-      mallocReg = getNextRegLabel()
+      mallocReg = llvmTranslator.getNextRegLabel()
       llvmInstrList.append(f"%u{mallocReg} = call i8* " +
                            f"@malloc(i32 {fieldCount})")
-      resultReg = f"%u{getNextRegLabel()}"
+      resultReg = f"%u{llvmTranslator.getNextRegLabel()}"
       llvmInstrList.append(f"{resultReg} = bitcast i8* " + 
                            f"%u{mallocReg} to " + 
                            f"%struct.{expr['id']}*")
@@ -167,7 +170,7 @@ def getExpReg(expr, llvmInstrList, idToRegMap, decls, types):
       llvmInstrList.append("call i32 (i8*, ...)* @scanf(i8* getelementptr " +
                            "inbounds([4 x i8]* @.read, i32 0, i32 0), " +
                            "i32* @.read_scratch)")
-      resultReg = f"%u{getNextRegLabel()}"
+      resultReg = f"%u{llvmTranslator.getNextRegLabel()}"
       llvmInstrList.append(f"{resultReg} = load i32* @.read_scratch")
    else:
       print("getExpReg error: Unrecognized expression type '" + expr["exp"] +
@@ -228,7 +231,7 @@ def getStructFieldReg(llvmInstrList, mapping, target, decls, types,
       else:
          tmpFieldReg = getStructField(llvmInstrList, target["left"], decls,
                                       types, True)
-         fieldReg = getNextRegLabel()
+         fieldReg = llvmTranslator.getNextRegLabel()
          # get field number
          fieldNum = -1
          for typ in types:
@@ -251,7 +254,7 @@ def getStructFieldReg(llvmInstrList, mapping, target, decls, types,
          fieldReg = loadFromStructField(llvmInstrList, rightLlvmType, 
                                         tmpfieldReg)
       else:
-         fieldReg = getNextRegLabel()
+         fieldReg = llvmTranslator.getNextRegLabel()
          # get field number
          fieldNum = -1
          for typ in types:
@@ -271,7 +274,7 @@ def getStructFieldReg(llvmInstrList, mapping, target, decls, types,
 
 
 def loadFromStructField(llvmInstrList, fieldType, fieldReg):
-   toReg = getNextRegLabel()
+   toReg = llvmTranslator.getNextRegLabel()
    llvmInstrList.append(f"%u{toReg} = load {fieldType}* %u{fieldReg}")
    return toReg
 
