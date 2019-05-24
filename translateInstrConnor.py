@@ -1,11 +1,5 @@
 from llvmTranslator import getNextRegLabel 
-"""
-def getNextRegLabel():
-   global regLabel
-   retReg = regLabel
-   regLabel += 1
-   return retReg
-"""
+
 
 # mapping -- a dictionary that maps string to int. Used to map identifiers to registers
 # types -- the list of types declared at the beginning of the json file
@@ -64,6 +58,26 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls):
       else: # return statement in the middle of cfg
          # TODO: handle return statements in middle of cfg
          pass
+   elif instrStmt == "invocation":
+      """
+      argList = []
+      argTypeList = []
+      for arg in instr["args"]:
+         argList.append(getExpReg(arg, llvmInstrList, mapping, decls, types))
+         argTypeList.append(lookupLlvmType(arg, decls, types))
+
+      # TODO: change return type to reflect method of obtaining it
+      returnType = "void"
+      invocLlvmInstr = f"call void @{instr['id']}("
+      for argIndex in range(len(argList)):
+         invocLlvmInstr += f"{argTypeList[argIndex]} {argList[argIndex]}"
+         if argIndex < len(argList) - 1:
+            invocLlvmInstr += ", "
+      invocLlvmInstr += ")"
+
+      llvmInstrList.append(invocLlvmInstr)
+      """
+      pass
    else:
       print(f"transInstr err: Unrecognized statement '{instrStmt}' in instr:" +
             f"\n{instr}")
@@ -140,18 +154,15 @@ def getExpReg(expr, llvmInstrList, idToRegMap, decls, types):
       llvmInstrList.append(f"{resultReg} = bitcast i8* " + 
                            f"%u{mallocReg} to " + 
                            f"%struct.{expr['id']}*")
-      
-
    elif expr["exp"] == "dot":
       structPtrReg = getStructFieldReg(llvmInstrList, idToRegMap, expr, 
                                        decls, types)
       resultReg = "%u" + str(loadFromStructField(llvmInstrList, 
                                  lookupLlvmType(expr, decls, types),
                                  structPtrReg))
-
    elif expr["exp"] == "invocation":
       # TODO: invocation
-
+      pass
    elif expr["exp"] == "read":
       llvmInstrList.append("call i32 (i8*, ...)* @scanf(i8* getelementptr " +
                            "inbounds([4 x i8]* @.read, i32 0, i32 0), " +
