@@ -6,12 +6,16 @@ import llvmTranslator
 # decls -- the list of global and local declarations for the function
 # TODO: change arguments of function to match how we handle declarations
 #       and types
-def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls):
+def transInstr(instr, llvmInstrList, currBlock, mapping,types,decls, funcCfg):
    # Insert return instruction if at the cfg exit block
    if len(curBlock.succrs) == 0:
-      retInstr = "ret "
+      if funcCfg.returnType == "void":
+         llvmInstrList.append("ret void")
+      else:
+         retInstr = f"ret {funcCfg.returnType} {mapping.get('return')}"
+         llvmInstrList.append(retInstr)
+      return
 
-   
    # check if guard for if/else or while statement
    if "guard" in instr:
       transBrInstr(instr["guard"], llvmInstrList, currBlock, mapping)
@@ -52,14 +56,18 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls):
       llvmInstrList.append(f"call void @free(i8* {bitcastReg})")
    elif instrStmt == "return":
       #TODO: return
-      if "exp" not in instr:
-         llvmInstrList.append("ret void")
-      else:
+      if "exp" in instr:
          sourceType = lookupLlvmType(instr["exp"], decls, types)
          sourceReg = getExpReg(instr["exp"], llvmInstrList, mapping,
                                   decls, types)
-         llvmInstrList.append(f"ret {sourceType} {sourceReg}")
+         mapping["return"] = sourceReg
 
+      #TODO: hope this doesn't break translation
+      exitBlock = currBlock
+      while len(exitBlock.succrs) > 0:
+         exitBlock = exitBlock.succrs[0]
+
+      exitBlock.instrs.append(instr)
 
    elif instrStmt == "invocation":
       """
