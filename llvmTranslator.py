@@ -1,6 +1,7 @@
 #!/bin/python3
 import queue
 import translateInstrConnor
+import re
 
 """
 Arithmetic:
@@ -113,7 +114,7 @@ def transArith(instr, block, llvmInstrs):
 def transBool():
    return ""
 
-def transCmp(instr, block, llvmInstrs):
+def transCmp(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg):
    #instrs = []
    op = instr["operator"]
    
@@ -149,7 +150,7 @@ def transCmp(instr, block, llvmInstrs):
    else:
       #lhs = "###"
       #print(f"lhs of line: {instr['line']} not num or id. -> {instr}")
-      lhs = translateInstr(instr['lft'], block, llvmInstrs)
+      lhs = translateInstr(instr['lft'], block, llvmInstrs, globals_and_locals, structTypes, cfg)
 
 
    if rhsType == "num":
@@ -160,7 +161,7 @@ def transCmp(instr, block, llvmInstrs):
    else:
       #rhs = "###"
       #print(f"rhs of line: {instr['line']} not num or id. -> {instr}")
-      rhs = translateInstr(instr['rht'], block, llvmInstrs)
+      rhs = translateInstr(instr['rht'], block, llvmInstrs, globals_and_locals, structTypes, cfg)
 
    target = getNextRegLabel()
    if type(lhs) == int and lhsType != "num":
@@ -183,16 +184,16 @@ def transStore():
 #recursive version with more abstraction
 #if in paramRegs/imm is a string then its a register of it is an int then it is an imm
 #params can only be arithmetic, nums, bools, invocations
-def transInvoc(instr, cfg, llvmInstrs):
+def transInvoc(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg):
    paramRegs = [None] * len(instr['args'])
 
    for i in range(len(instr["args"])):
       if instr["args"][i] == "invocation":
-         paramRegs[i] = transInvoc(instr["args"][i], cfg, llvmInstrs)
+         paramRegs[i] = transInvoc(instr["args"][i], block, llvmInstrs, globals_and_locals, structTypes, cfg)
 
       else:
          #paramRegs[i] = getNextRegLabel()
-         paramRegs[i] = translateInstr(instr['args'][i], cfg, llvmInstrs)
+         paramRegs[i] = translateInstr(instr['args'][i], block, llvmInstrs, globals_and_locals, structTypes, cfg)
 
    paramStr = """"""
    for i in range(len(paramRegs)):
@@ -274,13 +275,13 @@ def translateInstr(instr, block, llvmInstrs, globals_and_locals, structTypes, cf
    #instrType = instr.get('exp')
 
    if instrType == "arithmetic":
-         return transArith(instr, block, llvmInstrs)
+         return transArith(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg)
 
    elif instrType == "comparison":
-      return transCmp(instr, block, llvmInstrs)
+      return transCmp(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg)
 
    elif instrType == "invocation":
-      return transInvoc(instr, block, llvmInstrs)
+      return transInvoc(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg)
 
    elif instrType == "num":
       return instr['value']
@@ -290,6 +291,8 @@ def translateInstr(instr, block, llvmInstrs, globals_and_locals, structTypes, cf
 
    else:
       #pass the instruction to connors translation
+      if  getLabelDeclTable(block.label) == None:
+         print(f"ERROR: empty mapping:\n\tblock: {block.label}\ninstr:{instr}")
       translateInstrConnor.transInstr(
             instr, 
             llvmInstrs, 
@@ -342,11 +345,24 @@ def addLabelDecl(label, var, regName):
    else:
       labelDecls[label][var] = "%" + regName 
 
+def initVar(label, var):
+   global labelDecls
+   if not labelDecls.get(label):
+      labelDecls[label] = dict()
+
+   labelDecls[label][var] = None
+
 
 def getLabelDeclTable(label):
    global labelDecls
 
    return labelDecls.get(label)
+
+#TODO
+def handlePhi(label):
+   global labelDecls
+   for key in labelDecls[label]["incPhis"]:
+      return None
 
 #lookup registers from a given label/block
 #TODO if the there are multiple predecessors phi 
@@ -454,6 +470,8 @@ def translateInstrs(cfg, globals_and_locals, structTypes):
 
    #Iterate through blockList and translate instructions
    #for each block
+   for var in cfg.localDecls:
+      initVar(cfg.entry.label, var['id'])
    for block in blockList:
       if block.label != cfg.entry.label:
          llvmInstrs.append(f"L{block.label}:")

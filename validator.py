@@ -5,6 +5,8 @@ import sys
 from stmtChecks import lookupType, lookupExpType, checkStmt
 from cfg import buildProg
 from llvmTranslator import translateProg
+from llvmTranslator import handlePhi
+import re
 
 types = ("int", "bool", "struct id")
 
@@ -211,9 +213,14 @@ def main():
    for func in progFuncs.keys():
       print(f"define {progFuncs[func].retType} @{progFuncs[func].funcId}({progFuncs[func].params})")
       print("{")
+      curLabel = None
       for instr in progFuncs[func].instrs:
+         labels = re.findall("\AL[1234567890]*:", instr.strip())
+         if len(labels) >= 1:
+            curLabel = ord(labels[0][1:-1])
          if instr == "<PHI placeholder>":
             print(f"    <PHI placeholder found>")
+            #handlePhi(curLabel)
          else:
             print(f"    {instr}")
       print("}\n")
