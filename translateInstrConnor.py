@@ -4,8 +4,6 @@ import llvmTranslator
 # mapping -- a dictionary that maps string to int. Used to map identifiers to registers
 # types -- the list of types declared at the beginning of the json file
 # decls -- the list of global and local declarations for the function
-# TODO: change arguments of function to match how we handle declarations
-#       and types
 def transInstr(instr, llvmInstrList, currBlock, mapping,types,decls, funcCfg):
    # Insert return instruction if at the cfg exit block
    if len(curBlock.succrs) == 0:
@@ -55,7 +53,6 @@ def transInstr(instr, llvmInstrList, currBlock, mapping,types,decls, funcCfg):
                            f"{sourceReg} to i8*")
       llvmInstrList.append(f"call void @free(i8* {bitcastReg})")
    elif instrStmt == "return":
-      #TODO: return
       if "exp" in instr:
          sourceType = lookupLlvmType(instr["exp"], decls, types)
          sourceReg = getExpReg(instr["exp"], llvmInstrList, mapping,
@@ -64,9 +61,14 @@ def transInstr(instr, llvmInstrList, currBlock, mapping,types,decls, funcCfg):
 
       #TODO: hope this doesn't break translation
       exitBlock = currBlock
+      # Locate the CFG exit block
       while len(exitBlock.succrs) > 0:
          exitBlock = exitBlock.succrs[0]
 
+      # Add the return statement to the Exit block to remind the translator
+      # that it must be translated. 
+      # TODO: I'm hoping this will also work with the phi instructions.
+      # Depending on how phi instructions are handled, this may need changing
       exitBlock.instrs.append(instr)
 
    elif instrStmt == "invocation":

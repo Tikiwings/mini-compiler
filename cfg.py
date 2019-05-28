@@ -23,6 +23,7 @@ class Cfg:
       self.funcName = func["id"]
       self.returnType = func["return_type"]
 
+
    def printCfg(self):
       self.entry.printBlock(1)
 
@@ -102,9 +103,6 @@ class BlockNode:
          #      +str(self.label))
       printIndent(indentDepth+1)
       print("End of Successors to Block " + str(self.label))
-
-
-
       print()
 
 def buildProg(jsonProg): 
@@ -125,22 +123,27 @@ def createCfg(func, labelCount):
    
    currBlock = returnCfg.entry
    
-   returnLabCnt = addBlock(func["body"], returnCfg.entry, returnCfg.exit, 
-         returnLabCnt)
+   returnLabCnt = addBlock(func["body"], returnCfg.entry, returnCfg.exit,
+                           returnCfg.exit, returnLabCnt)
 
    return (returnCfg, returnLabCnt)
 
 
-def addBlock(body, currBlock, exit, label):
+def addBlock(body, currBlock, exit, cfgExit, label):
    labelCount = label
 
    for stmt in body:
       stmtType = stmt["stmt"]
       if stmtType == "return":
-         # attach current block to exit node
          currBlock.instrs.append(stmt)
-         # ignore code after return statement; break out of loop
-         break
+         
+         # TODO: make sure this doesn't break any of Donnie's implementation.
+         # Attach current block to exit node
+         currBlock.succrs.append(cfgExit)
+         cfgExit.preds.append(currBlock)
+
+         # ignore code after return statement
+         return labelCount
       elif stmtType == "if":
          
          # add guard expression to current block
@@ -154,7 +157,7 @@ def addBlock(body, currBlock, exit, label):
          currBlock.succrs.append(thenEntry)
          
          # assess instructions inside Then branch
-         labelCount = addBlock([stmt["then"]], thenEntry, thenExit, 
+         labelCount = addBlock([stmt["then"]], thenEntry, thenExit, cfgExit,
                labelCount + 2)
          
          # create Join Block aka Exit Node for if statement
@@ -174,7 +177,7 @@ def addBlock(body, currBlock, exit, label):
             currBlock.succrs.append(elseEntry)
             
             # assess instructions inside Else branch
-            labelCount = addBlock([stmt["else"]], elseEntry, elseExit,
+            labelCount = addBlock([stmt["else"]], elseEntry, elseExit, cfgExit,
                   labelCount + 2)
 
             # update preds & succrs for else exit and join block
@@ -189,7 +192,6 @@ def addBlock(body, currBlock, exit, label):
          currBlock = joinBlock
       elif stmtType == "while":
          # add guard expression to current block
-         """currBlock.instrs.append(stmt["guard"])"""
          currBlock.instrs.append({"guard" : stmt["guard"]})
 
          whileBlock = BlockNode(labelCount, "While")
@@ -201,11 +203,10 @@ def addBlock(body, currBlock, exit, label):
          whileBlock.preds.append(currBlock)
          #whileBlock.succrs.append(whileBlock)
          #whileBlock.succrs.append(joinBlock)
-         labelCount = addBlock([stmt["body"]], whileBlock, joinBlock,
+         labelCount = addBlock([stmt["body"]], whileBlock, joinBlock, cfgExit,
                labelCount + 2)
          
          # add guard at end of while block to determine which successor follows
-         """whileBlock.instrs.append(stmt["guard"])"""
          whileBlock.instrs.append({"guard" : stmt["guard"]})
 
          # update preds&succrs
@@ -221,10 +222,11 @@ def addBlock(body, currBlock, exit, label):
          #    of for loop.
          currBlock = joinBlock
       elif stmtType == "block":
+         #TODO: If llvm translation has errors with block labels, refer to this
          # add instructions from block statement into the current block
          # also add an exit node for block statement so that shit makes sense
          blockExit = BlockNode(labelCount, "BlockStmtExit")
-         addBlock(stmt["list"], currBlock, blockExit, labelCount + 1)
+         addBlock(stmt["list"], currBlock, blockExit, cfgExit, labelCount + 1)
          currBlock = blockExit
       else:  # print, assign, invocation
          currBlock.instrs.append(stmt)
