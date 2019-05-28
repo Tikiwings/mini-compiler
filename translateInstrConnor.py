@@ -16,7 +16,7 @@ def transInstr(instr, llvmInstrList, currBlock, mapping,types,decls, funcCfg):
 
    # check if guard for if/else or while statement
    if "guard" in instr:
-      transBrInstr(instr["guard"], llvmInstrList, currBlock, mapping)
+      transBrInstr(instr["guard"], llvmInstrList, currBlock, mapping, decls, types)
       # Break out of guard translation
       return
     
@@ -34,13 +34,14 @@ def transInstr(instr, llvmInstrList, currBlock, mapping,types,decls, funcCfg):
       # translate target
       if "left" in instr["target"]: # store source in struct field
          targetType = lookupLlvmType(instr["target"], decls, types)
-         targetReg = getStructFieldReg(llvmInstrList, mapping, target, decls,
-                                       types)
+         targetReg = getStructFieldReg(llvmInstrList, mapping, instr["target"],
+                                       decls, types)
          
          llvmInstrList.append(f"store {targetType} {sourceReg}, " +
                               f"{targetType}* {targetReg}")
       else: # update mapping
          targetId = instr["target"]["id"]
+         print(f"mapping: {mapping}\ntargetId: {targetId}")
          mapping[targetId] = sourceReg
 
    elif instrStmt == "delete":
@@ -54,7 +55,7 @@ def transInstr(instr, llvmInstrList, currBlock, mapping,types,decls, funcCfg):
       llvmInstrList.append(f"call void @free(i8* {bitcastReg})")
    elif instrStmt == "return":
       if "exp" in instr:
-         sourceType = lookupLlvmType(instr["exp"], decls, types)
+         #sourceType = lookupLlvmType(instr["exp"], decls, types)
          sourceReg = getExpReg(instr["exp"], llvmInstrList, mapping,
                                   decls, types)
          mapping["return"] = sourceReg
@@ -146,16 +147,18 @@ def getExpReg(expr, llvmInstrList, idToRegMap, decls, types):
                operator + "'")
          print(f"in expression: {expr}")
 
-      leftSide = getExpReg(expr["lft"], llvmInstrList, idToRegMap)
-      rightSide = getExpReg(expr["rht"], llvmInstrList, idToRegMap)
+      leftSide = getExpReg(expr["lft"], llvmInstrList, idToRegMap, decls, types)
+      rightSide = getExpReg(expr["rht"], llvmInstrList, idToRegMap, decls,types)
       llvmInstr += (leftSide + ", " + rightSide)
       llvmInstrList.append(llvmInstr)
    elif expr["exp"] == "new":
       # Get number of fields
       fieldCount = -1
       for typ in types:
-         if expr["id"] == typ["id"]:
-            fieldCount = len(typ["fields"])
+         #print(f"types: {types}")
+         #print(f"expr: {expr}\ntyp: {typ}")
+         if expr["id"] == typ:
+            fieldCount = len(types[typ]["fields"])
       if fieldCount == -1:
          print("getExpReg error: Tried to create new " +
                f"{expr['id']}, but not in types.")
@@ -168,8 +171,9 @@ def getExpReg(expr, llvmInstrList, idToRegMap, decls, types):
                            f"%u{mallocReg} to " + 
                            f"%struct.{expr['id']}*")
    elif expr["exp"] == "dot":
+      # TODO: If problem with dot expressions, refer here
       structPtrReg = getStructFieldReg(llvmInstrList, idToRegMap, expr, 
-                                       decls, types)
+                                       decls, types, True)
       resultReg = "%u" + str(loadFromStructField(llvmInstrList, 
                                  lookupLlvmType(expr, decls, types),
                                  structPtrReg))
@@ -206,8 +210,8 @@ def lookupStructType(target, decls, types):
    if "left" in target:
       leftStructType = lookupStructType(target["left"], decls, types)
       for typ in types:
-         if typ["id"] == leftStructType:
-            for field in typ["fields"]:
+         if typ == leftStructType:
+            for field in types[typ]["fields"]:
                if field["id"] == target["id"]:
                   return field["type"]
       # none of the types' fields matched the target's left identifier
@@ -216,8 +220,8 @@ def lookupStructType(target, decls, types):
 
    else:
       for decl in decls:
-         if decl["id"] == target["id"]:
-            return decl["type"]
+         if decl == target["id"]:
+            return decls[decl]["type"]
       # no declaration matched target's identifier
       print("getStructType Error: Could not find type for target: \n" +
             f"{target}\nwithin declarations:\n{decls}")
@@ -228,6 +232,7 @@ def lookupStructType(target, decls, types):
 
 def getStructFieldReg(llvmInstrList, mapping, target, decls, types, 
                       withLoad = False):
+   print(f"target: {target}")
    leftStructType = lookupStructType(target["left"], decls, types)
    leftStructLlvmType = lookupLlvmType(target["left"], decls, types)
    #rightType = lookupStructType(target, decls, types)
@@ -235,19 +240,20 @@ def getStructFieldReg(llvmInstrList, mapping, target, decls, types,
    fieldReg = -1
    if "left" in target["left"]:
       if withLoad:
-         tmpFieldReg = getStructFieldReg(llvmInstrList, target, decls, types)
+         tmpFieldReg = getStructFieldReg(llvmInstrList, mapping, target, 
+                                         decls, types)
          fieldReg = loadFromStructField(llvmInstrList, rightLlvmType,
                                         tmpFieldReg)
       else:
-         tmpFieldReg = getStructField(llvmInstrList, target["left"], decls,
-                                      types, True)
+         tmpFieldReg = getStructFieldReg(llvmInstrList, mapping, 
+                                         target["left"], decls, types, True)
          fieldReg = llvmTranslator.getNextRegLabel()
          # get field number
          fieldNum = -1
          for typ in types:
-            if typ["id"] == leftStructType:
-               for i in range(len(typ["fields"])):
-                  if typ["fields"][i]["id"] == target["id"]:
+            if typ == leftStructType:
+               for i in range(len(types[typ]["fields"])):
+                  if types[typ]["fields"][i]["id"] == target["id"]:
                      fieldNum = i
          if fieldNum == -1:
             print("getStructFieldReg error: no type found for ")
@@ -268,9 +274,9 @@ def getStructFieldReg(llvmInstrList, mapping, target, decls, types,
          # get field number
          fieldNum = -1
          for typ in types:
-            if typ["id"] == leftStructType:
-               for i in range(len(typ["fields"])):
-                  if typ["fields"][i]["id"] == target["id"]:
+            if typ == leftStructType:
+               for i in range(len(types[typ]["fields"])):
+                  if types[typ]["fields"][i]["id"] == target["id"]:
                      fieldNum = i
          if fieldNum == -1:
             print("getStructFieldReg error: no type found for ")
