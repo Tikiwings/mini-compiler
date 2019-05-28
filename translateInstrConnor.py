@@ -112,6 +112,8 @@ def transBrInstr(guard, llvmInstrList, currBlock, idToRegMap, decls, types):
 #   immediate value
 # exp types: id, num, binary, new, dot, invocation, read
 def getExpReg(expr, llvmInstrList, idToRegMap, decls, types):
+   resultReg = ""
+   
    if expr["exp"] == "id":  # identifier
       return idToRegMap.get(expr["id"])
    if expr["exp"] == "num":  # immediate
