@@ -204,7 +204,7 @@ def lookupLlvmType(target, decls, types):
 
 def lookupStructType(target, decls, types):
    if "left" in target:
-      leftStructType = getStructType(target["left"], decls, types)
+      leftStructType = lookupStructType(target["left"], decls, types)
       for typ in types:
          if typ["id"] == leftStructType:
             for field in typ["fields"]:
