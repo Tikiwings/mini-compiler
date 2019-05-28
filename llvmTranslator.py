@@ -1,5 +1,6 @@
 #!/bin/python3
 import queue
+import translateInstrConnor
 
 """
 Arithmetic:
@@ -211,9 +212,15 @@ def transAlloc():
 def transMisc():
    return ""
 
-
+#TODO instruction may be dict({guard: instr})
 def lookupInstrType(instr):
+
+   if "guard" in instr:
+      return "guard"
+
    instrType = instr.get('exp')
+   if instrType == None:
+      instrType = instr.get('stmt')
 
 
    if   instrType == "binary":
@@ -262,18 +269,18 @@ def lookupInstrType(instr):
 #return list of instruction strings
 #TODO change to take instr, cfg (blockNode), and a list of the current
 #llvmInstrs to be filled from within the translation methods
-def translateInstr(instr, cfg, llvmInstrs):
+def translateInstr(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg):
    instrType = lookupInstrType(instr)
    #instrType = instr.get('exp')
 
    if instrType == "arithmetic":
-         return transArith(instr, cfg, llvmInstrs)
+         return transArith(instr, block, llvmInstrs)
 
    elif instrType == "comparison":
-      return transCmp(instr, cfg, llvmInstrs)
+      return transCmp(instr, block, llvmInstrs)
 
    elif instrType == "invocation":
-      return transInvoc(instr, cfg, llvmInstrs)
+      return transInvoc(instr, block, llvmInstrs)
 
    elif instrType == "num":
       return instr['value']
@@ -282,8 +289,15 @@ def translateInstr(instr, cfg, llvmInstrs):
       return "null"
 
    else:
-      pass
       #pass the instruction to connors translation
+      translateInstrConnor.transInstr(
+            instr, 
+            llvmInstrs, 
+            block,
+            getLabelDeclTable(block.label),
+            structTypes,
+            globals_and_locals,
+            cfg) #curBlock, #mapping, #types, #decls
    """
    elif instrType == "boolean":
       pass
@@ -327,6 +341,12 @@ def addLabelDecl(label, var, regName):
       labelDecls[label][var] = f"%u{regName}"
    else:
       labelDecls[label][var] = "%" + regName 
+
+
+def getLabelDeclTable(label):
+   global labelDecls
+
+   return labelDecls.get(label)
 
 #lookup registers from a given label/block
 #TODO if the there are multiple predecessors phi 
@@ -407,7 +427,7 @@ def completePhis():
 """
 
 
-def translateInstrs(cfg):
+def translateInstrs(cfg, globals_and_locals, structTypes):
    llvmInstrs = []
    llvmInstrs.append(f"L{cfg.entry.label}:")
    
@@ -439,7 +459,13 @@ def translateInstrs(cfg):
          llvmInstrs.append(f"L{block.label}:")
       llvmInstrs.append("<PHI placeholder>")
       for instr in block.instrs:
-         translateInstr(instr, block, llvmInstrs)
+         translateInstr(
+               instr, 
+               block, 
+               llvmInstrs, 
+               globals_and_locals, 
+               structTypes,
+               cfg)
    """
    curBlock = cfg.entry
    for instr in curBlock.instrs:
@@ -510,24 +536,43 @@ def lookupParamTypes(params):
    return formattedParamStr[:len(formattedParamStr) - 1]
 
 
-def translateProg(progCfg):
+def translateProg(progCfg, globalSyms, structTypes):
    #print(progCfg.funcCfgs)
    progFuncs = {}
    
    for cfg in progCfg.funcCfgs:
       #progFuncs.add(cfg.funcName, funcLlvm(cfg))
-      progFuncs[cfg.funcName] = funcLlvm(cfg)
+      progFuncs[cfg.funcName] = funcLlvm(cfg, globalSyms, structTypes)
 
    return progFuncs
 
+def combineDict(lhs, rhs):
+   tmp = lhs.copy()
+   tmp.update(rhs)
+   return tmp
+
+def declListToDict(someList):
+   tmpDict = dict()
+   for entry in someList:
+      tmpDict[entry['id']] = entry
+
+   return tmpDict
+
 class funcLlvm:
-   def __init__(self, cfg):
+   def __init__(self, cfg, globalSyms, structTypes):
+      print("STARTING TO MAKE THE FUNCLLVM")
       #self.header = f"define {lookupLlvmType(retType)} @{funcId}({lookupParamTypes(params)})"
       self.funcId = cfg.funcName
       self.retType = lookupLlvmType(cfg.returnType)
       self.params = lookupParamTypes(cfg.params)
       #self.openBlock = "{"
-      self.instrs = translateInstrs(cfg)
+      print(f"Global Syms Type: {type(globalSyms)}\tLocalDecls Type: {type(cfg.localDecls)}")
+      print(f"GlobalSyms: \n{globalSyms}")
+      print(f"localSyms: \n{cfg.localDecls}")
+      self.instrs = translateInstrs(
+            cfg, 
+            combineDict(globalSyms, declListToDict(cfg.localDecls)), 
+            structTypes)
       #self.closeBlock = "}"
    """
    def __str__(self):

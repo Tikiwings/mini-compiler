@@ -200,7 +200,10 @@ def main():
    #print(symTable)
    progCfg = buildProg(progFile)
    progCfg.printProg()
-   progFuncs = translateProg(progCfg)
+   progFuncs = translateProg(
+         progCfg, 
+         symTable["__global__"],
+         structTable)
 
    print("#####################################")
    print("###########Llvm Prog#################")
