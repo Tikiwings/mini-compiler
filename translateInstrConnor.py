@@ -6,7 +6,7 @@ import llvmTranslator
 # decls -- the list of global and local declarations for the function
 def transInstr(instr, llvmInstrList, currBlock, mapping,types,decls, funcCfg):
    # Insert return instruction if at the cfg exit block
-   if len(curBlock.succrs) == 0:
+   if len(currBlock.succrs) == 0:
       if funcCfg.returnType == "void":
          llvmInstrList.append("ret void")
       else:
