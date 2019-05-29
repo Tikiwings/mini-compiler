@@ -47,6 +47,7 @@ class BlockNode:
       self.preds = []
       self.label = label
       self.blockType = blockType
+      self.visited = False
 
 
    # Returns a list of reachable blocks including the block itself and its
