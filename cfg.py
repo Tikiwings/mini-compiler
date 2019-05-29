@@ -24,8 +24,15 @@ class Cfg:
       self.returnType = func["return_type"]
 
 
+   def removeDeadBlocks(self):
+      # Create list of reachable block labels
+      reachableLabels = self.entry.getReachableBlocks([])
+      
+      self.entry.removeDeadPreds(reachableLabels, [])
+
+
    def printCfg(self):
-      self.entry.printBlock(1)
+      self.entry.printBlock(1, [])
 
    
 # Every block contains:
@@ -40,14 +47,50 @@ class BlockNode:
       self.preds = []
       self.label = label
       self.blockType = blockType
-      self.visited = False
 
 
-   def printBlock(self, indentDepth):
-      if self.visited:
+   # Returns a list of reachable blocks including the block itself and its
+   # successors.
+   def getReachableBlocks(self, visitedLabels):
+      # Prevent visiting blocks more than once
+      if self.label in visitedLabels:
+         return []
+      visitedLabels.append(self.label)
+
+      retList = [self.label]
+
+      # Add reachable blocks of successors into current block's reachables
+      for succr in self.succrs:
+         retList += succr.getReachableBlocks(visitedLabels)
+
+      return retList
+
+
+   # Removes the unreachable predecessors
+   def removeDeadPreds(self, reachableLabels, visitedBlocks):
+      # Prevent visiting blocks more than once
+      if self.label in visitedBlocks:
          return
+      visitedBlocks.append(self.label)
 
-      self.visited = True
+      # Remove dead predecessors of current block
+      predIndex = 0
+      while predIndex < len(self.preds):
+         if self.preds[predIndex].label not in reachableLabels:
+            del self.preds[predIndex]
+         else:
+            predIndex += 1
+
+      # Remove dead predecessors of the successors
+      for succr in self.succrs:
+         succr.removeDeadPreds(reachableLabels, visitedBlocks)
+
+
+   def printBlock(self, indentDepth, visitedLabels):
+      # Prevent visiting blocks more than once
+      if self.label in visitedLabels:
+         return
+      visitedLabels.append(self.label)
 
       printIndent(indentDepth)
       print("Label " + str(self.label) + " " + str(self.blockType)+"="*10)
@@ -57,7 +100,6 @@ class BlockNode:
       print("Instructions:")
       printIndent(indentDepth+1)
       print(self.instrs)
-      #print(" "*indentDepth*3+ str(self.instrs))
       
       # Succrs
       printIndent(indentDepth+1)
@@ -65,13 +107,10 @@ class BlockNode:
       if len(self.succrs) == 0:
          printIndent(indentDepth+2)
          print("None")
-         #print(" "*(indentDepth+1)*3+ "None")
       else:
          for succr in self.succrs:
             printIndent(indentDepth+2)
             print("Label " + str(succr.label)+" "+str(succr.blockType)+",")
-            #print(" "*(indentDepth+1)*3+ "Label "+str(succr.label)+" "+
-            #      str(succr.blockType)+",")
 
       # Predecessors
       printIndent(indentDepth+1)
@@ -79,31 +118,20 @@ class BlockNode:
       if len(self.preds) == 0:
          printIndent(indentDepth+2)
          print("None")
-         #print(" "*(indentDepth+1)*3+ "None")
       else:
          for pred in self.preds:
             printIndent(indentDepth+2)
             print("Label " + str(pred.label)+" "+str(pred.blockType)+",")
-            #print(" "*(indentDepth+1)*3+ "Label "+str(pred.label)+" "+
-            #      str(pred.blockType)+",")
       
       # Print successor blocks
       printIndent(indentDepth+1)
       print("Successors to Block " + str(self.label))
       for successor in self.succrs:
-         #printIndent(indentDepth+1)
-         #print("Successors to Block" + str(self.label))
-         #print(" "*indentDepth*3+ "Successors to Block " + str(self.label))
-
-         successor.printBlock(indentDepth + 2)
-         
-         #printIndent(indentDepth+1)
-         #print("End of Successors to Block " + str(self.label))
-         #print(" "*indentDepth*3+ "End of Successors to Block "
-         #      +str(self.label))
+         successor.printBlock(indentDepth + 2, visitedLabels)
       printIndent(indentDepth+1)
       print("End of Successors to Block " + str(self.label))
       print()
+
 
 def buildProg(jsonProg): 
    returnProg = ProgramCfgs(jsonProg)
@@ -112,6 +140,7 @@ def buildProg(jsonProg):
    for func in jsonProg["functions"]:
       funcCfgAndLabel = createCfg(func, labelCount)
       labelCount = funcCfgAndLabel[1]
+      funcCfgAndLabel[0].removeDeadBlocks()
       returnProg.funcCfgs.append(funcCfgAndLabel[0])
 
    return returnProg
@@ -137,7 +166,6 @@ def addBlock(body, currBlock, exit, cfgExit, label):
       if stmtType == "return":
          currBlock.instrs.append(stmt)
          
-         # TODO: make sure this doesn't break any of Donnie's implementation.
          # Attach current block to exit node
          currBlock.succrs.append(cfgExit)
          cfgExit.preds.append(currBlock)
