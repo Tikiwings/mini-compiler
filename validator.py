@@ -217,7 +217,7 @@ def main():
       for instr in progFuncs[func].instrs:
          labels = re.findall("\AL[1234567890]*:", instr.strip())
          if len(labels) >= 1:
-            curLabel = ord(labels[0][1:-1])
+            curLabel = int(labels[0][1:-1])
          if instr == "<PHI placeholder>":
             print(f"    <PHI placeholder found>")
             #handlePhi(curLabel)

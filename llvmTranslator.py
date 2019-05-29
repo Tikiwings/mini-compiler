@@ -220,8 +220,12 @@ def lookupInstrType(instr):
       return "guard"
 
    instrType = instr.get('exp')
+   """
    if instrType == None:
       instrType = instr.get('stmt')
+   """
+   if instr.get("stmt") == "return":
+      return "return"
 
 
    if   instrType == "binary":
@@ -289,10 +293,14 @@ def translateInstr(instr, block, llvmInstrs, globals_and_locals, structTypes, cf
    elif instrType == "null":
       return "null"
 
+   #elif instrType == "return":
+
+
    else:
       #pass the instruction to connors translation
       if  getLabelDeclTable(block.label) == None:
          print(f"ERROR: empty mapping:\n\tblock: {block.label}\ninstr:{instr}")
+         print(f"block 0 decls : {getLabelDeclTable(0)}")
       translateInstrConnor.transInstr(
             instr, 
             llvmInstrs, 
@@ -351,6 +359,7 @@ def initVar(label, var):
       labelDecls[label] = dict()
 
    labelDecls[label][var] = None
+   print(f"Added {var} to decls")
 
 
 def getLabelDeclTable(label):
@@ -470,13 +479,15 @@ def translateInstrs(cfg, globals_and_locals, structTypes):
 
    #Iterate through blockList and translate instructions
    #for each block
-   for var in cfg.localDecls:
-      initVar(cfg.entry.label, var['id'])
+   print(f"%%%%%%%%%%%%%%%GLOBALS_AND_LOCALS: {globals_and_locals}")
+   for var in globals_and_locals:
+      initVar(cfg.entry.label, var)
    for block in blockList:
       if block.label != cfg.entry.label:
          llvmInstrs.append(f"L{block.label}:")
       llvmInstrs.append("<PHI placeholder>")
       for instr in block.instrs:
+         print(f"translating instruction: {instr}")
          translateInstr(
                instr, 
                block, 
@@ -505,14 +516,21 @@ def getAllBlocks(cfg):
 
    while not iterQue.empty():
       curBlock = iterQue.get()
-      curBlock.visited = True
+      #curBlock.visited = True
       for block in curBlock.succrs:
+         """
          if not block.visited:
             iterQue.put(block)
             blockList.append(block)
-
+         """
+         if block not in blockList:
+            iterQue.put(block)
+            blockList.append(block)
+   """
    for block in blockList:
       block.visited = False
+   """
+
    return blockList
 
 
