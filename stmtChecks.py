@@ -90,7 +90,8 @@ def checkReturn(syms, funcs, structs, stmt, func):
    if stmt.get("exp") != None:
       expType = lookupExpType(syms, funcs, structs, stmt["exp"])
    else:
-      expType = None
+      #expType = None
+      expType = "void"
 
    #print("return type: {}".format(retType))
    #print("expType: {}\n".format(expType))
@@ -117,7 +118,7 @@ def checkBlock(syms, funcs, structs, stmt, func):
    for blckStmt in stmt["list"]:
       checkStmt(syms, funcs, structs, blckStmt, func)
 
-
+#TODO fix target
 def checkAssign(syms, funcs, structs, stmt, func):
    source = stmt["source"]
    target = stmt["target"]
@@ -126,10 +127,13 @@ def checkAssign(syms, funcs, structs, stmt, func):
 
    #tarType = vd.lookupType(syms, tarId)
    #sourceType = vd.lookupExpType(syms, funcs, structs, stmt)
+   #if "left" in target:
+
    tarType = lookupType(syms, tarId)
    sourceType = lookupExpType(syms, funcs, structs, stmt["source"])
 
    if not checkTypes(tarType, sourceType):
+      #print(f"Target Type: {tarType}\tSourceType: {sourceType}")
       typeError(stmt)
 
 
@@ -310,7 +314,7 @@ def lookupExpType(syms, funcs, structs, stmt):
       op = stmt["operator"]
       if op in ("+", "-", "/", "*", "%"):
          return "int"
-      elif op in ("<", ">", "<=", ">="):
+      elif op in ("<", ">", "<=", ">=", "=="):
          return "bool"
 
    elif exp == "id":
@@ -343,6 +347,9 @@ def lookupExpType(syms, funcs, structs, stmt):
    
    elif exp == "new":
       return stmt["id"]
+
+   elif exp == "read":
+      return "int"
 
    elif exp == "unary":
       return lookupExpType(syms, funcs, structs, stmt["operand"])

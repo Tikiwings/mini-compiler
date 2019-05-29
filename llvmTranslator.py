@@ -301,7 +301,7 @@ def translateInstr(instr, block, llvmInstrs, globals_and_locals, structTypes, cf
       if  getLabelDeclTable(block.label) == None:
          print(f"ERROR: empty mapping:\n\tblock: {block.label}\ninstr:{instr}")
          print(f"block 0 decls : {getLabelDeclTable(0)}")
-      translateInstrConnor.transInstr(
+      return translateInstrConnor.transInstr(
             instr, 
             llvmInstrs, 
             block,
