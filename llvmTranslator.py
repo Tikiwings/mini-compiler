@@ -81,7 +81,7 @@ def transArith(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg):
    #resultReg = getNextRegLabel()
 
    lhsType = instr['lft']['exp']
-   lrhsType = instr['rht']['exp']
+   rhsType = instr['rht']['exp']
    
    if lhsType == "num":
       lhs = instr['lft']['value']
