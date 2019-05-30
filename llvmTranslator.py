@@ -75,7 +75,7 @@ labelDecls = {}
 ##############################
 
 
-def transArith(instr, block, llvmInstrs):
+def transArith(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg):
    #instrs = []
    op = instr['operator']
    #resultReg = getNextRegLabel()
