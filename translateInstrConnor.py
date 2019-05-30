@@ -74,8 +74,8 @@ def transInstr(instr, llvmInstrList, currBlock, mapping,types,decls, funcCfg):
          #sourceType = lookupLlvmType(instr["exp"], decls, types)
          sourceReg = getExpReg(instr["exp"], llvmInstrList, mapping,
                                currBlock, decls, types, funcCfg)
-         print("transInstr error: trying to write return value into mapping" +
-               f" but can't.\nMapping is  {mapping}")
+         #print("transInstr error: trying to write return value into mapping" +
+         #      f" but can't.\nMapping is  {mapping}")
          llvmTranslator.addLabelDecl(currBlock.label, "return", 
                                      int(sourceReg[2:]))
          #mapping["return"] = sourceReg
@@ -91,7 +91,22 @@ def transInstr(instr, llvmInstrList, currBlock, mapping,types,decls, funcCfg):
       # TODO: I'm hoping this will also work with the phi instructions.
       # Depending on how phi instructions are handled, this may need changing
       exitBlock.instrs.append(instr)
+   elif instrStmt == "print":
+      sourceReg = getExpReg(instr["exp"], llvmInstrList, mapping, currBlock,
+                            decls, types, funcCfg)
 
+      # Start off the print instruction
+      printInstr = ("call i32 (i8*, ...)* @printf(i8* getelementptr " +
+                    "inbounds ([5 x i8]* @.print")
+ 
+      # Check for endl in print statement
+      if instr["endl"] == True:
+         printInstr += "ln"
+
+      # Finish off the print instruction
+      printInstr += (", i32 0, i32 0), i32 {sourceReg})")
+
+      llvmInstrList.append(printInstr)
    elif instrStmt == "invocation":
       """
       argList = []
@@ -244,15 +259,15 @@ def lookupStructType(target, decls, types):
                   return field["type"]
       # none of the types' fields matched the target's left identifier
       print("getStructType Error: Could not find type for left of target: \n" +
-            f"{target}\nwithin types: \n{types}")
+            f"    {target}\n    within types: \n    {types}")
 
    else:
       for decl in decls:
          if decl == target["id"]:
             return decls[decl]["type"]
       # no declaration matched target's identifier
-      print("getStructType Error: Could not find type for target: \n" +
-            f"{target}\nwithin declarations:\n{decls}")
+      print("getStructType Error: Could not find type for target: \n    " +
+            f"{target}\n    within declarations:\n    {decls}")
 
    # If no types came up from looking in the types, return None
    return None
