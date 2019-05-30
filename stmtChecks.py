@@ -123,13 +123,31 @@ def checkAssign(syms, funcs, structs, stmt, func):
    source = stmt["source"]
    target = stmt["target"]
    
-   tarId = target["id"]
+  
+   if "left" in target:
+      tarIds = list()
+      while "left" in target:
+         tarIds.append(target)
+         target = target['left']
+      tarIds.append(target)
+      left = tarIds.pop()
+      tarType = lookupType(syms, left['id'])
+      while tarIds:
+         id = tarIds.pop()
+         fieldCheck = checkField(structs, tarType, id)
+         if fieldCheck[1]:
+            tarType = fieldCheck[1]
+         else:
+           structError(left, id, fieldCheck[0], stmt) 
+         left = id
+   else:
+      tarId = target["id"]
+      tarType = lookupType(syms, tarId)
 
    #tarType = vd.lookupType(syms, tarId)
    #sourceType = vd.lookupExpType(syms, funcs, structs, stmt)
    #if "left" in target:
 
-   tarType = lookupType(syms, tarId)
    sourceType = lookupExpType(syms, funcs, structs, stmt["source"])
 
    if not checkTypes(tarType, sourceType):
