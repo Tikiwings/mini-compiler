@@ -76,8 +76,15 @@ def transInstr(instr, llvmInstrList, currBlock, mapping,types,decls, funcCfg):
                                currBlock, decls, types, funcCfg)
          #print("transInstr error: trying to write return value into mapping" +
          #      f" but can't.\nMapping is  {mapping}")
-         llvmTranslator.addLabelDecl(currBlock.label, "return", 
-                                     int(sourceReg[2:]))
+         # TODO: Make sure addLabelDecl can take an integer or bool immediate
+         if len(sourceReg) < 2 or sourceReg[:1] != "%":
+            print("Connor.transInstr: Trying to add label decl for an " +
+                  f"immediate: {sourceReg}")
+            llvmTranslator.addLabelDecl(currBlock.label, "return", 
+                                        sourceReg)
+         else:
+            llvmTranslator.addLabelDecl(currBlock.label, "return", 
+                                        int(sourceReg[2:]))
          #mapping["return"] = sourceReg
 
       #TODO: hope this doesn't break translation
@@ -244,6 +251,9 @@ def lookupLlvmType(target, decls, types):
    elif llvmType == "void":
       return "void"
    elif llvmType == None:
+      print("Connor.lookupLlvmType ERROR: 'None' returned from " +
+            "Connor.lookupStructType.\n    No type was found for " +
+            f"argument {target}")
       return "i32"
    else:
       return f"%struct.{llvmType}*"
