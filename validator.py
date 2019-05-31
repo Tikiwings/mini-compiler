@@ -2,7 +2,7 @@
 import json
 import sys
 #import stmtChecks as st
-from stmtChecks import lookupType, lookupExpType, checkStmt
+from stmtChecks import lookupType, lookupExpType, checkStmt, didPass, checkFailed
 from cfg import buildProg
 from llvmTranslator import translateProg
 from llvmTranslator import handlePhi
@@ -22,13 +22,33 @@ def getGlobalDecls(prog, symTable):
       addDecl(symTable, ID)
 
 
+#=================================Flags==========================================
+printLlvm = False
+
+def setPrintFlag():
+   global printLlvm
+   printLlvm = True
+
+def getPrintFlag():
+   global printLlvm
+   return printLlvm
+
+#================================================================================
+
+
 ##################################################################################
 #Error functions
 def redeclError(dup):
+   checkFailed()
    print("Redeclration error\n\tline:{}\n\tid:{}\n".format(dup["line"], dup["id"]))
 
 def returnError(funcId):
+   checkFailed()
    print("Return error in func: {} not return equivalent\n".format(funcId))
+
+def typeCheckFailed():
+   print("Errors found while type checking.\nFix the found errors in order to compile")
+   sys.exit(1)
 
 ##################################################################################
 
@@ -182,8 +202,19 @@ def checkFuncs(prog, symTable, structTable, funTable):
       print("==========================\n")
       checkFunc(func, symTableCpy, structTable, funTable)
 
-def createJson():
-   with open(sys.argv[1], "r") as f:
+
+def parseArgs():
+   args = sys.argv.copy()
+   if "-stack" in sys.argv:
+      args.remove("-stack")
+      setPrintFlag()
+   return args[1]
+
+
+
+
+def createJson(fileName):
+   with open(fileName, "r") as f:
       progFile = json.load(f)
    #print(json.dumps(progFile, indent=4))
    return progFile
@@ -192,11 +223,22 @@ def main():
    symTable = {"__global__" : {}}
    structTable = {}
    funTable = {}
-   progFile = createJson()
+   fileName = parseArgs()
+   llvmFileName = re.search("(.*)[.].*", fileName).groups()[0] + ".ll"
+   progFile = createJson(fileName)
 
    makeStructTable(progFile, structTable)
    getGlobalDecls(progFile, symTable["__global__"])
    checkFuncs(progFile, symTable, structTable, funTable)
+
+   #check if type checking passed without errors
+   #exit if not and continue if passed
+   if not didPass():
+      typeCheckFailed()
+   
+   #don't print if flag is not set
+   if not getPrintFlag():
+      sys.exit(1)
 
    #print(structTable)
    #print(symTable)

@@ -56,32 +56,54 @@ Types of Stmt:
    
 '''
 
+#==============================Type checking pass or fail============================
+typeCheckPassed = True
+
+def didPass():
+   global typeCheckPassed
+   return typeCheckPassed
+
+def checkFailed():
+   global typeCheckPassed
+   typeCheckPassed = False
+
+#====================================================================================
+
+
 #=======================ERROR Functions============================================
 
 def typeError(stmt):
+   checkFailed()
    print("Type error found: Line: {}\n".format(stmt["line"]))
 
 def funcError(stmt):
+   checkFailed()
    print("Func error found:\n\tLine: {}\n\tFunc: {}\n".format(stmt["line"], stmt["id"]))
 
 def argCountError(stmt, actual, given):
+   checkFailed()
    print("Incorrect number of arguments error found:\n\tLine: {}\n\t\
          args needed: {}\n\targs given: {}\n".format(stmt["line"], actual, given))
 
 def guardError(stmt):
+   checkFailed()
    print("Guard error found:\n\tLine: {}\n".format(stmt["line"]))
 
 def binaryError(stmt):
+   checkFailed()
    print("Binary error found:\n\tLine: {}".format(stmt["line"]))
 
 def structError(left, fieldId, errMsg, stmt):
+   checkFailed()
    print("Struct error found: ({})\n\tLine: {}\n \
          Left: {}\n\t\t\tField: {}\n".format(errMsg, stmt.get("line"), left.get("id"), fieldId))
 
 def printError(stmt):
+   checkFailed()
    print("Print error found: (Not an int)\n\tLine: {}\n".format(stmt["line"]))
 
 #====================================================================================
+
 
 
 
