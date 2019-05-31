@@ -4,7 +4,6 @@ import llvmTranslator
 #TODO: Fix 'int' return type to be 'i32'
 #TODO: Remove stack-related instructions
 #TODO: Find out why label declaration table returns 'None'
-#TODO: Add instructions are interpreted as Sub
 #TODO: Registers interpreted as %u%uX
 
 # mapping -- a dictionary that maps string to int. Used to map identifiers to registers
@@ -61,11 +60,8 @@ def transInstr(instr, llvmInstrList, currBlock, mapping,types,decls, funcCfg):
          #      f" but can't.\n    Mapping is  {mapping}\n    " +
          #      f"Mapping key is  {targetId}")
 
-         #llvmTranslator.addLabelDecl(label, var, regName)
-         #
          #llvmTranslator.addLabelDecl(currBlock.label, targetId, 
-         #                            int(sourceReg[2:]))
-         
+         #                            int(sourceReg[2:])) 
          # TODO: Make sure addLabelDecl can take an integer or bool immediate
          if len(sourceReg) < 2 or sourceReg[:1] != "%":
             print("Connor.transInstr: Trying to add label decl for an " +
@@ -200,9 +196,9 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg):
       elif operator == "!=":
          llvmInstr += "icmp ne i32 "
       elif operator == "-":
-         llvmInstr += "add i32 "
-      elif operator == "+":
          llvmInstr += "sub i32 "
+      elif operator == "+":
+         llvmInstr += "add i32 "
       elif operator == "*":
          llvmInstr += "mul i32 "
       elif operator == "/":
