@@ -1,5 +1,11 @@
 import llvmTranslator
 
+#TODO: Unconditional branches at the end of block
+#TODO: Fix 'int' return type to be 'i32'
+#TODO: Remove stack-related instructions
+#TODO: Find out why label declaration table returns 'None'
+#TODO: Add instructions are interpreted as Sub
+#TODO: Registers interpreted as %u%uX
 
 # mapping -- a dictionary that maps string to int. Used to map identifiers to registers
 # types -- the list of types declared at the beginning of the json file
