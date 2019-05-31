@@ -224,7 +224,7 @@ def main():
    structTable = {}
    funTable = {}
    fileName = parseArgs()
-   llvmFileName = re.search("(.*)[.].*", fileName).groups()[0] + ".ll"
+   llvmFileName = re.search("(.*)[.]*.*", fileName).groups()[0] + ".ll"
    progFile = createJson(fileName)
 
    makeStructTable(progFile, structTable)
@@ -257,12 +257,12 @@ def main():
       print("{")
       curLabel = None
       for instr in progFuncs[func].instrs:
-         labels = re.findall("\AL[1234567890]*:", instr.strip())
+         labels = re.findall("\ALU[1234567890]*:", instr.strip())
          if len(labels) >= 1:
-            curLabel = int(labels[0][1:-1])
+            curLabel = int(labels[0][2:-1])
          if instr == "<PHI placeholder>":
-            print(f"    <PHI placeholder found>")
-            #handlePhi(curLabel)
+            #print(f"    <PHI placeholder found>")
+            handlePhi(curLabel)
          else:
             print(f"    {instr}")
       print("}\n")
