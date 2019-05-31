@@ -354,7 +354,7 @@ def lookupExpType(syms, funcs, structs, stmt):
       op = stmt["operator"]
       if op in ("+", "-", "/", "*", "%"):
          return "int"
-      elif op in ("<", ">", "<=", ">=", "=="):
+      elif op in ("<", ">", "<=", ">=", "==", "!=", "&&", "||"):
          return "bool"
 
    elif exp == "id":
