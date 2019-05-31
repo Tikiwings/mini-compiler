@@ -62,8 +62,20 @@ def transInstr(instr, llvmInstrList, currBlock, mapping,types,decls, funcCfg):
          #      f"Mapping key is  {targetId}")
 
          #llvmTranslator.addLabelDecl(label, var, regName)
-         llvmTranslator.addLabelDecl(currBlock.label, targetId, 
-                                     int(sourceReg[2:]))
+         #
+         #llvmTranslator.addLabelDecl(currBlock.label, targetId, 
+         #                            int(sourceReg[2:]))
+         
+         # TODO: Make sure addLabelDecl can take an integer or bool immediate
+         if len(sourceReg) < 2 or sourceReg[:1] != "%":
+            print("Connor.transInstr: Trying to add label decl for an " +
+                  f"immediate: {sourceReg}")
+            llvmTranslator.addLabelDecl(currBlock.label, targetId, 
+                                        sourceReg)
+         else:
+            llvmTranslator.addLabelDecl(currBlock.label, targetId, 
+                                        int(sourceReg[2:]))
+
          #mapping[targetId] = sourceReg
 
    elif instrStmt == "delete":
