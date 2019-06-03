@@ -52,7 +52,7 @@ def transInstr(instr, llvmInstrList, currBlock, mapping,types,decls, funcCfg):
                                        instr["target"], decls, types)
          
          llvmInstrList.append(f"store {targetType} {sourceReg}, " +
-                              f"{targetType}* {targetReg}")
+                              f"{targetType}* %u{targetReg}")
       else: # update mapping
          targetId = instr["target"]["id"]
          #print(f"mapping: {mapping}\nMapping dict index: {targetId}")
@@ -240,7 +240,7 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg):
    elif expr["exp"] == "dot":
       # TODO: If problem with dot expressions, refer here
       structPtrReg = getStructFieldReg(llvmInstrList, mapping, currBlock,
-                                       expr, decls, types, True)
+                                       expr, decls, types)
       resultReg = "%u" + str(loadFromStructField(llvmInstrList, 
                                  lookupLlvmType(expr, decls, types),
                                  structPtrReg))
@@ -305,6 +305,7 @@ def lookupStructType(target, decls, types):
    return None
 
 
+#TODO: multiple loads
 def getStructFieldReg(llvmInstrList, mapping, currBlock, target, decls, types,
                       withLoad = False):
    leftStructType = lookupStructType(target["left"], decls, types)
