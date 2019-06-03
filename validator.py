@@ -4,11 +4,12 @@ import sys
 #import stmtChecks as st
 from stmtChecks import lookupType, lookupExpType, checkStmt, didPass, checkFailed
 from cfg import buildProg
-from llvmTranslator import translateProg
-from llvmTranslator import handlePhi
+from llvmTranslator import translateProg, handlePhi, getAllLabelDeclTables
 import re
 
-types = ("int", "bool", "struct id")
+#types = ("int", "bool", "struct id")
+
+
 
 def makeStructTable(prog, structTable):
    for struct in prog["types"]:
@@ -20,6 +21,7 @@ def makeStructTable(prog, structTable):
 def getGlobalDecls(prog, symTable):
    for ID in prog["declarations"]:
       addDecl(symTable, ID)
+
 
 
 #=================================Flags==========================================
@@ -219,12 +221,51 @@ def createJson(fileName):
    #print(json.dumps(progFile, indent=4))
    return progFile
 
+
+def transGlobals(globals):
+   globStrs = list()
+   
+   for var in globals:
+      globType = var['type']
+      if globType == "int" or globType == "bool":
+         globTypeStr = "i32"
+      else:
+         globTypeStr = f"%struct.{globType}*"
+      globStrs.append(f"@{var['id']} = common global {globTypeStr} null, align 8")
+
+   return globStrs
+
+
+def transStructs(structs):
+   structStrs = list()
+
+   for struct in structs:
+      structType = struct['id']
+      structStr = f"%struct.{structType} = type "
+      structStr += "{"
+      for field in struct['fields']:
+         fieldType = field['type']
+
+         if fieldType == "int" or fieldType == "bool":
+            structStr += "i32, "
+         else:
+            structStr += f"%struct.{fieldType}*, "
+      structStr = structStr[:-2] + "}"
+      structStrs.append(structStr)
+   return structStrs
+
+
+
+
 def main():
    symTable = {"__global__" : {}}
    structTable = {}
    funTable = {}
    fileName = parseArgs()
-   llvmFileName = re.search("(.*)[.]*.*", fileName).groups()[0] + ".ll"
+   if "." in fileName:
+      llvmFileName = re.search("(.*)[.].*", fileName).groups()[0] + ".ll"
+   else:
+      llvmFileName = re.search("(.*)json.*", fileName).groups()[0] + ".ll"
    progFile = createJson(fileName)
 
    makeStructTable(progFile, structTable)
@@ -247,14 +288,32 @@ def main():
    progFuncs = translateProg(
          progCfg, 
          symTable["__global__"],
-         structTable)
+         structTable,
+         funTable)
 
    print("#####################################")
    print("###########Llvm Prog#################")
    print("#####################################")
+   #print(f"Writing to {llvmFileName}")
+   #print(f"Choices with {fileName}: {re.search('(.*)[.]*.*', fileName).groups()}")
+   llvmFile = open(llvmFileName, "w+")
+
+   #LLvm header, struct definitions, and globals
+   print("target triple=\"i686\"")
+   llvmFile.write("target triple=\"i686\"\n")
+   for str in transStructs(progFile['types']):
+      print(str)
+      llvmFile.write(str + "\n")
+   for str in transGlobals(progFile['declarations']):
+      print(str)
+      llvmFile.write(str + "\n")
+
+   #LLvm instructions translation
    for func in progFuncs.keys():
       print(f"define {progFuncs[func].retType} @{progFuncs[func].funcId}({progFuncs[func].params})")
       print("{")
+      llvmFile.write(f"define {progFuncs[func].retType} @{progFuncs[func].funcId}({progFuncs[func].params})\n")
+      llvmFile.write("{\n")
       curLabel = None
       for instr in progFuncs[func].instrs:
          labels = re.findall("\ALU[1234567890]*:", instr.strip())
@@ -262,10 +321,15 @@ def main():
             curLabel = int(labels[0][2:-1])
          if instr == "<PHI placeholder>":
             #print(f"    <PHI placeholder found>")
-            handlePhi(curLabel)
+            phiInstrs = handlePhi(curLabel)
+            for phi in phiInstrs:
+               print(f"    {phi}")
+               llvmFile.write(f"    {phi}\n")
          else:
             print(f"    {instr}")
+            llvmFile.write(f"    {instr}\n")
       print("}\n")
+      llvmFile.write("}\n")
    print(f"""declare i8* @malloc(i32)
 declare void @free(i8*)
 declare i32 @printf(i8*, ...)
@@ -274,11 +338,22 @@ declare i32 @scanf(i8*, ...)
 @.print = private unnamed_addr constant [5 x i8] c"%ld \\00", align 1
 @.read = private unnamed_addr constant [4 x i8] c"%ld\\00", align 1
 @.read_scratch = common global i32 0, align 4""")
+   llvmFile.write(f"""declare i8* @malloc(i32)
+declare void @free(i8*)
+declare i32 @printf(i8*, ...)
+declare i32 @scanf(i8*, ...)
+@.println = private unnamed_addr constant [5 x i8] c"%ld\\0A\\00", align 1
+@.print = private unnamed_addr constant [5 x i8] c"%ld \\00", align 1
+@.read = private unnamed_addr constant [4 x i8] c"%ld\\00", align 1
+@.read_scratch = common global i32 0, align 4\n""")
+   print(f"All Decls {getAllLabelDeclTables()}")
+   print(f"Phi Decls {getAllLabelDeclTables().get('incPhis')}")
    ''' for x,y in progFile.items():
       for p in progFile[x]:
          print(p)
       print("=======================================================")
    '''
+   llvmFile.close()
 
-
-main()
+if __name__ == "__main__":
+   main()

@@ -72,6 +72,26 @@ Misc:
 #global register counter
 regLabel = 0
 labelDecls = {}
+funcTable = {}
+
+visitedBlocks = set()
+
+
+#global accessor methods
+def getFuncTable():
+   global funcTable
+   return funcTable
+
+def visited(label):
+   global visitedBlocks
+   return label in visitedBlocks
+
+
+
+#global mutator methods
+def addVisited(label):
+   global visitedBlocks
+   visitedBlocks.add(label)
 ##############################
 
 
@@ -186,6 +206,7 @@ def transStore():
 #params can only be arithmetic, nums, bools, invocations
 def transInvoc(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg):
    paramRegs = [None] * len(instr['args'])
+   invocRetType = getFuncTable()[instr['id']]['return_type']
 
    for i in range(len(instr["args"])):
       if instr["args"][i] == "invocation":
@@ -201,11 +222,17 @@ def transInvoc(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg):
          paramStr += ", "
       paramStr += f"i32 {paramRegs[i]}"
    resultReg = getNextRegLabel()
-   llvmInstrs.append(f"%u{resultReg} = call @{instr['id']}({paramStr})")
-   #TODO this might need to only return the register number so that formating 
-   #stays consistent to other returns
-   #return f"%u{resultReg}"
-   return f"%u{resultReg}"
+
+   if invocRetType == "void":
+      llvmInstrs.append(f"call {invocRetType} @{instr['id']}({paramStr})")
+      return None
+   elif invocRetType == "int" or invocRetType == "bool":
+      llvmInstrs.append(f"%u{resultReg} = call i32 @{instr['id']}({paramStr})")
+      return f"%u{resultReg}"
+   else:
+      llvmInstrs.append(f"%u{resultReg} = call %struct.{invocRetType}* @{instr['id']}({paramStr})")
+      return f"%u{resultReg}"
+
 
 def transAlloc():
    return ""
@@ -219,7 +246,9 @@ def lookupInstrType(instr):
    if "guard" in instr:
       return "guard"
 
-   instrType = instr.get('exp')
+   instrType = instr.get('stmt')
+   if not instrType:
+      instrType = instr.get('exp')
    """
    if instrType == None:
       instrType = instr.get('stmt')
@@ -299,8 +328,8 @@ def translateInstr(instr, block, llvmInstrs, globals_and_locals, structTypes, cf
    else:
       #pass the instruction to connors translation
       if  getLabelDeclTable(block.label) == None:
-         print(f"ERROR: empty mapping:\n\tblock: {block.label}\ninstr:{instr}")
-         print(f"block 0 decls : {getLabelDeclTable(0)}")
+         #print(f"ERROR: empty mapping:\n\tblock: {block.label}\ninstr:{instr}")
+         print(f"block {block.label} decls : {getLabelDeclTable(block.label)}")
       return translateInstrConnor.transInstr(
             instr, 
             llvmInstrs, 
@@ -367,11 +396,43 @@ def getLabelDeclTable(label):
 
    return labelDecls.get(label)
 
+def getAllLabelDeclTables():
+   global labelDecls
+   return labelDecls
+
 #TODO
 def handlePhi(label):
    global labelDecls
-   for key in labelDecls[label]["incPhis"]:
-      return None
+   print(f"<Looking for phis in label {label}>")
+   phiStrList = list()
+
+   if labelDecls.get(label):
+      if labelDecls[label].get("incPhis"):
+         print(labelDecls[label]["incPhis"])
+         for phiReg in labelDecls[label]["incPhis"]:
+            #print(phiInstr)
+            phiStr = f"%u{phiReg} = phi <put type here> "
+            for pred in labelDecls[label]["incPhis"][phiReg]["block"].preds:
+               alreadyComputed = False
+               phiLabelLoc = [None]
+               for param in labelDecls[label]["incPhis"][phiReg]["params"]:
+                  if param['startLabel'] == pred.label:
+                     alreadyComputed = True
+                     phiStr += f"[{param['reg']}, {param['label']}],"
+               if not alreadyComputed:
+                  sourceReg = lookupLabelDecl(pred, labelDecls[label]["incPhis"][phiReg]['varName'], phiLabelLoc) 
+                  phiStr += f"[{sourceReg}, {phiLabelLoc[0]}],"
+            phiStrList.append(phiStr[:-1])
+   return phiStrList
+
+
+   """
+   if labelDecls.get("incPhis"):
+      if labelDecls["incPhis"].get(label):
+         for key in labelDecls["incPhis"][label]:
+            print(f"key {key}\tval: {labelDecls['incPhis'][label][key]}")
+            #return None
+   """
 
 #lookup registers from a given label/block
 #TODO if the there are multiple predecessors phi 
@@ -393,11 +454,14 @@ def lookupLabelDecl(label, varName):
 """
 
 #""" #replacement lookup
-def lookupLabelDecl(block, varName, phiLabelLoc = None):
+
+def lookupLabelDecl(block, varName, phiLabelLoc = None, phiHandler = False):
    global labelDecls
-   if not labelDecls.get(block.label):
-      return None
-   reg = labelDecls[block.label].get(varName)
+   print(f"looking for {varName} in {block.label}")
+   #TODO fix this to propogate upwards correctly   
+   reg = None
+   if labelDecls.get(block.label):
+      reg = labelDecls[block.label].get(varName)
 
    if reg:
       if phiLabelLoc:
@@ -411,28 +475,42 @@ def lookupLabelDecl(block, varName, phiLabelLoc = None):
 
    elif len(block.preds) == 1:
       if phiLabelLoc:
-         lookupLabelDecl(block.preds[0], varName, phiLabelLoc)
+         return lookupLabelDecl(block.preds[0], varName, phiLabelLoc, phiHandler = phiHandler)
       else:
-         lookupLabelDecl(block.preds[0], varName)
+         return lookupLabelDecl(block.preds[0], varName, phiHandler = phiHandler)
 
    else:
       phiReg = getNextRegLabel()
-      labelDecls[block.label][varName] = phiReg 
-      preds = block.preds
-      if labelDecls.get('incPhis') == None:
-         labelDecls['incPhis'] = dict()
+      print(f"Adding decl {varName} -> {phiReg}")
+      if not labelDecls.get(block.label):
+         labelDecls[block.label] = dict()
+      labelDecls[block.label][varName] = f"%u{phiReg}" 
+      if labelDecls[block.label].get('incPhis') == None:
+         labelDecls[block.label]['incPhis'] = dict()
 
-      labelDecls['incPhis'][phiReg] = list()
+      labelDecls[block.label]['incPhis'][phiReg] = dict()
+      labelDecls[block.label]['incPhis'][phiReg]['block'] = block
+      labelDecls[block.label]['incPhis'][phiReg]['varName'] = varName
+      labelDecls[block.label]['incPhis'][phiReg]['params'] = list()
+
+
+      preds = block.preds
       for pred in preds:
-         if pred.visited:
+         print(f"Looking for {varName} in pred label {pred.label}... visited: {pred.visited}")
+         if visited(pred.label):
             phiLabel = [None]
             lookupReg = lookupLabelDecl(pred, varName, phiLabel)
-            labelDecls['incPhis'][phiReg].append({"reg": lookupReg, "label":phiLabel[0]})
+            labelDecls[block.label]['incPhis'][phiReg]['params'].append({
+               "reg": lookupReg, 
+               "label":phiLabel[0], 
+               "startLabel" : pred.label})
 
+         """
          else:
-            labelDecls['incPhis'][phiReg].append({"reg":None, "label": None})
+            labelDecls[block.label]['incPhis'][phiReg].append({"reg":None, "label": None})
+         """
 
-      return phiReg
+      return f"%u{phiReg}"
          
 #"""
 
@@ -441,21 +519,14 @@ def phiLookup():
 """
 
 
-"""
-def completePhis():
-   global labelDecls
-
-   for key in labelDecls.keys()
-      incPhis = labelDecls[key].get('incPhis')
-      if incPhis:
-         
-"""
+def completePhi(block, varName, phiLabelLoc):
+   pass
 
 
 def translateInstrs(cfg, globals_and_locals, structTypes):
    llvmInstrs = []
-   llvmInstrs.append(f"L{cfg.entry.label}:")
-   
+   llvmInstrs.append(f"LU{cfg.entry.label}:")
+   """ 
    #inital allocations for function
    if cfg.returnType != "void":
       llvmInstrs.append(f"%_retval_ = alloca {lookupLlvmType(cfg.returnType)}")
@@ -470,6 +541,7 @@ def translateInstrs(cfg, globals_and_locals, structTypes):
       llvmType = lookupLlvmType(param['type'])
       paramId = param['id']
       llvmInstrs.append(f"store {llvmType} %{paramId}, {llvmType}* %_P_{paramId}")
+   """
 
    #TODO finish translating rest of the blocks instructions and each successor block 
    #iterate through all instructions
@@ -482,9 +554,11 @@ def translateInstrs(cfg, globals_and_locals, structTypes):
    print(f"%%%%%%%%%%%%%%%GLOBALS_AND_LOCALS: {globals_and_locals}")
    for var in globals_and_locals:
       initVar(cfg.entry.label, var)
+   for param in cfg.params:
+      addLabelDecl(cfg.entry.label, param['id'], param['id'] )
    for block in blockList:
       if block.label != cfg.entry.label:
-         llvmInstrs.append(f"L{block.label}:")
+         llvmInstrs.append(f"LU{block.label}:")
       llvmInstrs.append("<PHI placeholder>")
       for instr in block.instrs:
          print(f"translating instruction: {instr}")
@@ -495,6 +569,8 @@ def translateInstrs(cfg, globals_and_locals, structTypes):
                globals_and_locals, 
                structTypes,
                cfg)
+      print(f"Block {block.label} has been completely visited")
+      addVisited(block.label)
    """
    curBlock = cfg.entry
    for instr in curBlock.instrs:
@@ -552,7 +628,8 @@ def lookupLlvmType(llvmType):
    elif llvmType == "void":
       return "void"
    else:
-      return "i32"
+      #return "i32"
+      return f"%struct.{llvmType}*"
 
 def lookupParamTypes(params):
    paramTable = {}
@@ -563,7 +640,7 @@ def lookupParamTypes(params):
    paramStrs = []
 
    for param in params:
-      paramStrs.append(f"{param['type']} %{param['id']}")
+      paramStrs.append(f"{paramTable[param['id']]} %{param['id']}")
 
    formattedParamStr = ""
    for paramStr in paramStrs:
@@ -572,9 +649,11 @@ def lookupParamTypes(params):
    return formattedParamStr[:len(formattedParamStr) - 1]
 
 
-def translateProg(progCfg, globalSyms, structTypes):
+def translateProg(progCfg, globalSyms, structTypes, funTable):
    #print(progCfg.funcCfgs)
+   global funcTable
    progFuncs = {}
+   funcTable = funTable
    
    for cfg in progCfg.funcCfgs:
       #progFuncs.add(cfg.funcName, funcLlvm(cfg))
@@ -597,6 +676,7 @@ def declListToDict(someList):
 class funcLlvm:
    def __init__(self, cfg, globalSyms, structTypes):
       print("STARTING TO MAKE THE FUNCLLVM")
+      #print(cfg.params)
       #self.header = f"define {lookupLlvmType(retType)} @{funcId}({lookupParamTypes(params)})"
       self.funcId = cfg.funcName
       self.retType = lookupLlvmType(cfg.returnType)
