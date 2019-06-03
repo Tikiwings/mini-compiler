@@ -1,10 +1,10 @@
 import llvmTranslator
 
 #TODO: Unconditional branches at the end of block
-#TODO: Fix 'int' return type to be 'i32'
 #TODO: Remove stack-related instructions
 #TODO: Find out why label declaration table returns 'None'
 #TODO: Registers interpreted as %u%uX
+#TODO: In stmtChecks.py add support for '&&' and '||' in binary expressions
 
 # mapping -- a dictionary that maps string to int. Used to map identifiers to registers
 # types -- the list of types declared at the beginning of the json file
@@ -16,7 +16,7 @@ def transInstr(instr, llvmInstrList, currBlock, mapping,types,decls, funcCfg):
          llvmInstrList.append("ret void")
       else:
          retReg = llvmTranslator.lookupLabelDecl(currBlock, 'return')
-         retInstr = f"ret {funcCfg.returnType} {retReg}"
+         retInstr = f"ret {convertLlvmType(funcCfg.returnType)} {retReg}"
          llvmInstrList.append(retInstr)
       return
 
@@ -203,6 +203,10 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg):
          llvmInstr += "mul i32 "
       elif operator == "/":
          llvmInstr += "sdiv i32 "
+      elif operator == "&&":
+         llvmInstr += "and i32 "
+      elif operator == "||":
+         llvmInstr += "or i32 "
       else:
          print("getExpReg error: Unknown or unaccounted operator: '" +
                operator + "'")
@@ -258,19 +262,23 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg):
 
 
 def lookupLlvmType(target, decls, types):
-   llvmType = lookupStructType(target, decls, types)
+   miniType = lookupStructType(target, decls, types)
    
-   if llvmType == "int" or llvmType == "bool":
+   return convertLlvmType(miniType)
+
+
+def convertLlvmType(miniType):
+   if miniType == "int" or miniType == "bool":
       return "i32"
-   elif llvmType == "void":
+   elif miniType == "void":
       return "void"
-   elif llvmType == None:
-      print("Connor.lookupLlvmType ERROR: 'None' returned from " +
+   elif miniType == None:
+      print("Connor.convertLlvmType ERROR: 'None' returned from " +
             "Connor.lookupStructType.\n    No type was found for " +
-            f"argument {target}")
+            f"argument {miniType}")
       return "i32"
    else:
-      return f"%struct.{llvmType}*"
+      return f"%struct.{miniType}*"
 
 
 def lookupStructType(target, decls, types):
