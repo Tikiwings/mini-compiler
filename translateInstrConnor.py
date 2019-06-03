@@ -232,7 +232,7 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg):
          
       mallocReg = llvmTranslator.getNextRegLabel()
       llvmInstrList.append(f"%u{mallocReg} = call i8* " +
-                           f"@malloc(i32 {fieldCount})")
+                           f"@malloc(i32 {fieldCount * 4})")
       resultReg = f"%u{llvmTranslator.getNextRegLabel()}"
       llvmInstrList.append(f"{resultReg} = bitcast i8* " + 
                            f"%u{mallocReg} to " + 
