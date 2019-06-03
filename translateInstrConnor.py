@@ -361,8 +361,7 @@ def getStructFieldReg(llvmInstrList, mapping, currBlock, target, decls, types,
          #structReg = mapping.get(target['left']['id'])
          llvmInstrList.append(f"%u{fieldReg} = getelementptr " +
                               f"{leftStructLlvmType} " +
-                              f"%u{structReg}, " +
-                              f"i1 0, i32 {fieldNum}")
+                              f"{structReg}, i1 0, i32 {fieldNum}")
 
    return fieldReg
 
