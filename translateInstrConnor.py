@@ -125,7 +125,7 @@ def transInstr(instr, llvmInstrList, currBlock, mapping,types,decls, funcCfg):
          printInstr += "ln"
 
       # Finish off the print instruction
-      printInstr += (", i32 0, i32 0), i32 {sourceReg})")
+      printInstr += f", i32 0, i32 0), i32 {sourceReg})"
 
       llvmInstrList.append(printInstr)
    elif instrStmt == "invocation":
