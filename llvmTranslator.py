@@ -380,7 +380,10 @@ def addLabelDecl(label, var, regName):
    if type(regName) == int:
       labelDecls[label][var] = f"%u{regName}"
    else:
-      labelDecls[label][var] = "%" + regName 
+      if re.match("[1234567890]*", regName):
+         labelDecls[label][var] = regName
+      else:
+         labelDecls[label][var] = "%" + regName 
 
 def initVar(label, var):
    global labelDecls
@@ -418,10 +421,10 @@ def handlePhi(label):
                for param in labelDecls[label]["incPhis"][phiReg]["params"]:
                   if param['startLabel'] == pred.label:
                      alreadyComputed = True
-                     phiStr += f"[{param['reg']}, {param['label']}],"
+                     phiStr += f"[{param['reg']}, %LU{param['label']}],"
                if not alreadyComputed:
                   sourceReg = lookupLabelDecl(pred, labelDecls[label]["incPhis"][phiReg]['varName'], phiLabelLoc) 
-                  phiStr += f"[{sourceReg}, {phiLabelLoc[0]}],"
+                  phiStr += f"[{sourceReg}, %LU{phiLabelLoc[0]}],"
             phiStrList.append(phiStr[:-1])
    return phiStrList
 
@@ -569,6 +572,8 @@ def translateInstrs(cfg, globals_and_locals, structTypes):
                globals_and_locals, 
                structTypes,
                cfg)
+      if len(block.succrs) == 1:
+         llvmInstrs.append(f"br label %LU{block.succrs[0].label}")
       print(f"Block {block.label} has been completely visited")
       addVisited(block.label)
    """

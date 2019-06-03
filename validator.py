@@ -231,7 +231,7 @@ def transGlobals(globals):
          globTypeStr = "i32"
       else:
          globTypeStr = f"%struct.{globType}*"
-      globStrs.append(f"@{var['id']} = common global {globTypeStr} null, align 8")
+      globStrs.append(f"@{var['id']} = common global {globTypeStr} null, align 4")
 
    return globStrs
 
@@ -326,8 +326,12 @@ def main():
                print(f"    {phi}")
                llvmFile.write(f"    {phi}\n")
          else:
-            print(f"    {instr}")
-            llvmFile.write(f"    {instr}\n")
+            if instr[0] == 'L':
+               print(instr)
+               llvmFile.write(instr + "\n")
+            else:
+               print(f"    {instr}")
+               llvmFile.write(f"    {instr}\n")
       print("}\n")
       llvmFile.write("}\n")
    print(f"""declare i8* @malloc(i32)
