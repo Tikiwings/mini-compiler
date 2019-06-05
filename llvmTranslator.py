@@ -71,8 +71,11 @@ Misc:
 ##############GLOBALS#########
 #global register counter
 regLabel = 0
+
+#global dictionaries
 labelDecls = {}
 funcTable = {}
+funcSymTable = {}
 
 visitedBlocks = set()
 
@@ -86,12 +89,27 @@ def visited(label):
    global visitedBlocks
    return label in visitedBlocks
 
+def getFuncSymType(funcId, varId):
+   global funcSymTable
+   if funcSymTable[funcId].get(varId):
+      return funcSymTable[funcId][varId].get('type')
+   return None
 
 
 #global mutator methods
 def addVisited(label):
    global visitedBlocks
    visitedBlocks.add(label)
+
+def addfunSymTable(funcId, syms):
+   global funcSymTable
+   funcSymTable[funcId] = syms
+
+def addFuncSymEntry(funcId, symName, sym):
+   global funcSymTable
+   if not funcSymTable.get(funcId):
+      funcSymTable[funcId] = dict()
+   funcSymTable[funcId][symName] = sym
 ##############################
 
 
@@ -102,17 +120,45 @@ def transArith(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg):
 
    lhsType = instr['lft']['exp']
    rhsType = instr['rht']['exp']
+   print(f"\tlhsType: {lhsType}\nrhsType: {rhsType}")
    
    if lhsType == "num":
       lhs = instr['lft']['value']
    elif lhsType == "id":
-      lhs = lookupLabelDecl(block, instr['lft']['id'])
+      lhs = lookupLabelDecl(block, instr['lft']['id'], instrType = "i32")
+   elif lhsType == "unary":
+      lhsInstr = instr['lft']
+      negation = False
+      if lhsInstr['operator'] == "-":
+         while lhsInstr.get("exp") == "unary":
+            lhsInstr = lhsInstr.get("operand")
+            negation = not negation
+      if lhsInstr.get('exp') == "num":
+         lhs = lhsInstr['value']
+      elif lhsInstr.get('exp') == "id":
+         lhs = lookupLabelDecl(block, lhsInstr['id'], instrType = "i32")
+      if negation:
+         lhs = "-" + lhs
+         
 
 
    if rhsType == "num":
       rhs = instr['rht']['value']
    elif rhsType == "id":
-      rhs = lookupLabelDecl(block, instr['rht']['id'])
+      rhs = lookupLabelDecl(block, instr['rht']['id'], instrType = "i32")
+   elif rhsType == "unary":
+      rhsInstr = instr['rht']
+      negation = False
+      if rhsInstr['operator'] == "-":
+         while rhsInstr.get("exp") == "unary":
+            rhsInstr = rhsInstr.get("operand")
+            negation = not negation
+      if rhsInstr.get('exp') == "num":
+         rhs = rhsInstr['value']
+      elif rhsInstr.get('exp') == "id":
+         rhs = lookupLabelDecl(block, rhsInstr['id'], instrType = "i32")
+      if negation:
+         rhs = "-" + rhs
 
 
    #lookupLabelDecl(label, leftOp)
@@ -161,12 +207,13 @@ def transCmp(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg):
 
    lhsType = instr['lft']['exp']
    rhsType = instr['rht']['exp']
+   print(f"\tICMP lType: {lhsType}\n\tICMP rType: {rhsType}")
    
    if lhsType == "num":
       lhs = instr['lft']['value']
    elif lhsType == "id":
       #lhs = f"%u{lookupLabelDecl(block, instr['lft']['id'])}"
-      lhs = lookupLabelDecl(block, instr['lft']['id'])
+      lhs = lookupLabelDecl(block, instr['lft']['id'], instrType = "i32")
    else:
       #lhs = "###"
       #print(f"lhs of line: {instr['line']} not num or id. -> {instr}")
@@ -177,7 +224,7 @@ def transCmp(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg):
       rhs = instr['rht']['value']
    elif rhsType == "id":
       #rhs = f"%u{lookupLabelDecl(block, instr['rht']['id'])}"
-      rhs = lookupLabelDecl(block, instr['rht']['id'])
+      rhs = lookupLabelDecl(block, instr['rht']['id'], instrType = "i32")
    else:
       #rhs = "###"
       #print(f"rhs of line: {instr['line']} not num or id. -> {instr}")
@@ -234,6 +281,24 @@ def transInvoc(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg):
       return f"%u{resultReg}"
 
 
+def transUnary(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg):
+   negation = False
+   instrItr = instr
+   retVal = None
+   while instrItr.get('exp') == "unary":
+      instrItr = instrItr.get('operand')
+      negation = not negation
+   
+   retValType = instrItr.get("exp")
+   if retValType == "num":
+      retVal  = instrItr.get("value")
+   elif retValeType == "id":
+      retVal = lookupLabelDecl(block, instrItr['id'])
+
+   if negation:
+      retVal = "-" + retVal
+   return retVal
+
 def transAlloc():
    return ""
 
@@ -286,6 +351,9 @@ def lookupInstrType(instr):
    elif instrType == "null":
       return "null"
 
+   elif instrType == "unary":
+      return "unary"
+
    elif instrType == "misc":
       return None
 
@@ -321,6 +389,13 @@ def translateInstr(instr, block, llvmInstrs, globals_and_locals, structTypes, cf
 
    elif instrType == "null":
       return "null"
+
+   elif instrType == "unary":
+      return transUnary(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg)
+
+   elif instrType == "block":
+      for blockInstr in instr['list']:
+         translateInstr(blockInstr, block, llvmInstrs, globals_and_locals, structTypes, cfg)
 
    #elif instrType == "return":
 
@@ -380,7 +455,7 @@ def addLabelDecl(label, var, regName):
    if type(regName) == int:
       labelDecls[label][var] = f"%u{regName}"
    else:
-      if re.match("[1234567890]*", regName):
+      if re.match("[1234567890]+", regName):
          labelDecls[label][var] = regName
       else:
          labelDecls[label][var] = "%" + regName 
@@ -404,7 +479,7 @@ def getAllLabelDeclTables():
    return labelDecls
 
 #TODO
-def handlePhi(label):
+def handlePhi(label, funcId):
    global labelDecls
    print(f"<Looking for phis in label {label}>")
    phiStrList = list()
@@ -414,17 +489,20 @@ def handlePhi(label):
          print(labelDecls[label]["incPhis"])
          for phiReg in labelDecls[label]["incPhis"]:
             #print(phiInstr)
-            phiStr = f"%u{phiReg} = phi <put type here> "
+            #phiStr = f"%u{phiReg} = phi {labelDecls[label]['incPhis'][phiReg]['type']} "
+            phiStr = f"%u{phiReg} = phi {lookupLlvmType(getFuncSymType(funcId, labelDecls[label]['incPhis'][phiReg]['varName']))} "
             for pred in labelDecls[label]["incPhis"][phiReg]["block"].preds:
                alreadyComputed = False
                phiLabelLoc = [None]
                for param in labelDecls[label]["incPhis"][phiReg]["params"]:
                   if param['startLabel'] == pred.label:
                      alreadyComputed = True
-                     phiStr += f"[{param['reg']}, %LU{param['label']}],"
+                     #phiStr += f"[{param['reg']}, %LU{param['label']}],"
+                     phiStr += f"[{param['reg']}, %LU{pred.label}],"
                if not alreadyComputed:
                   sourceReg = lookupLabelDecl(pred, labelDecls[label]["incPhis"][phiReg]['varName'], phiLabelLoc) 
-                  phiStr += f"[{sourceReg}, %LU{phiLabelLoc[0]}],"
+                  #phiStr += f"[{sourceReg}, %LU{phiLabelLoc[0]}],"
+                  phiStr += f"[{sourceReg}, %LU{pred.label}],"
             phiStrList.append(phiStr[:-1])
    return phiStrList
 
@@ -458,7 +536,7 @@ def lookupLabelDecl(label, varName):
 
 #""" #replacement lookup
 
-def lookupLabelDecl(block, varName, phiLabelLoc = None, phiHandler = False):
+def lookupLabelDecl(block, varName, phiLabelLoc = None, phiHandler = False, instrType = None):
    global labelDecls
    print(f"looking for {varName} in {block.label}")
    #TODO fix this to propogate upwards correctly   
@@ -478,9 +556,9 @@ def lookupLabelDecl(block, varName, phiLabelLoc = None, phiHandler = False):
 
    elif len(block.preds) == 1:
       if phiLabelLoc:
-         return lookupLabelDecl(block.preds[0], varName, phiLabelLoc, phiHandler = phiHandler)
+         return lookupLabelDecl(block.preds[0], varName, phiLabelLoc, phiHandler = phiHandler, instrType = instrType)
       else:
-         return lookupLabelDecl(block.preds[0], varName, phiHandler = phiHandler)
+         return lookupLabelDecl(block.preds[0], varName, phiHandler = phiHandler, instrType = instrType)
 
    else:
       phiReg = getNextRegLabel()
@@ -497,12 +575,13 @@ def lookupLabelDecl(block, varName, phiLabelLoc = None, phiHandler = False):
       labelDecls[block.label]['incPhis'][phiReg]['params'] = list()
 
 
+
       preds = block.preds
       for pred in preds:
          print(f"Looking for {varName} in pred label {pred.label}... visited: {pred.visited}")
          if visited(pred.label):
             phiLabel = [None]
-            lookupReg = lookupLabelDecl(pred, varName, phiLabel)
+            lookupReg = lookupLabelDecl(pred, varName, phiLabel, instrType = instrType)
             labelDecls[block.label]['incPhis'][phiReg]['params'].append({
                "reg": lookupReg, 
                "label":phiLabel[0], 
@@ -512,6 +591,10 @@ def lookupLabelDecl(block, varName, phiLabelLoc = None, phiHandler = False):
          else:
             labelDecls[block.label]['incPhis'][phiReg].append({"reg":None, "label": None})
          """
+      """
+      if not labelDecls[block.label]['incPhis'][phiReg].get('type'):
+         labelDecls[block.label]['incPhis'][phiReg]['type'] = instrType
+      """
 
       return f"%u{phiReg}"
          
@@ -552,13 +635,18 @@ def translateInstrs(cfg, globals_and_locals, structTypes):
    #Get list of all blocks to iterate through
    blockList = getAllBlocks(cfg)
 
-   #Iterate through blockList and translate instructions
-   #for each block
+   #initialize and add local/global vars
    print(f"%%%%%%%%%%%%%%%GLOBALS_AND_LOCALS: {globals_and_locals}")
    for var in globals_and_locals:
       initVar(cfg.entry.label, var)
+      addFuncSymEntry(cfg.funcName, var, globals_and_locals[var])
    for param in cfg.params:
       addLabelDecl(cfg.entry.label, param['id'], param['id'] )
+      addFuncSymEntry(cfg.funcName, param['id'], param)
+   addFuncSymEntry(cfg.funcName, 'return', {'type' : cfg.returnType})
+
+   #Iterate through blockList and translate instructions
+   #for each block
    for block in blockList:
       if block.label != cfg.entry.label:
          llvmInstrs.append(f"LU{block.label}:")
@@ -574,6 +662,11 @@ def translateInstrs(cfg, globals_and_locals, structTypes):
                cfg)
       if len(block.succrs) == 1:
          llvmInstrs.append(f"br label %LU{block.succrs[0].label}")
+
+      if block.label == cfg.exit.label and cfg.returnType == "void":
+         llvmInstrs.append("ret void")
+
+
       print(f"Block {block.label} has been completely visited")
       addVisited(block.label)
    """

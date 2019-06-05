@@ -227,11 +227,14 @@ def checkBinary(syms, funcs, structs, stmt):
    lhsType = lookupExpType(syms, funcs, structs, stmt["lft"])
    rhsType = lookupExpType(syms, funcs, structs, stmt["rht"])
    op = stmt["operator"]
-   badTypes = ("bool", "null")
-
+   #badTypes = ("bool", "null")
+   #badTypes = ("null",)
+   """
    if not checkTypes(lhsType, rhsType)\
          or lhsType in badTypes\
          or rhsType in badTypes:
+   """
+   if not checkTypes(lhsType, rhsType):
       typeError(stmt)
 
 

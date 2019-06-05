@@ -321,7 +321,7 @@ def main():
             curLabel = int(labels[0][2:-1])
          if instr == "<PHI placeholder>":
             #print(f"    <PHI placeholder found>")
-            phiInstrs = handlePhi(curLabel)
+            phiInstrs = handlePhi(curLabel, func)
             for phi in phiInstrs:
                print(f"    {phi}")
                llvmFile.write(f"    {phi}\n")
