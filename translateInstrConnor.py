@@ -182,6 +182,8 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
       resultReg = f"%u{llvmTranslator.getNextRegLabel()}"
       llvmInstr = resultReg + " = "
 
+
+      operator = expr["operator"]
       if operator == "-":
          llvmInstr += f"sub i32 0, {negatant}"
       elif operator == "!":  # TODO: zext/trunc if type error
