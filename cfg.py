@@ -251,11 +251,11 @@ def addBlock(body, currBlock, exit, cfgExit, label):
          #    of for loop.
          currBlock = joinBlock
       elif stmtType == "block":
-         #TODO: If llvm translation has errors with block labels, refer to this
          # add instructions from block statement into the current block
          # also add an exit node for block statement so that shit makes sense
          blockExit = BlockNode(labelCount, "BlockStmtExit")
-         addBlock(stmt["list"], currBlock, blockExit, cfgExit, labelCount + 1)
+         labelCount = addBlock(stmt["list"], currBlock, blockExit, cfgExit, 
+                               labelCount + 1)
          currBlock = blockExit
       else:  # print, assign, invocation
          currBlock.instrs.append(stmt)

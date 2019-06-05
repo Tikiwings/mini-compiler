@@ -1,15 +1,12 @@
 import llvmTranslator
 
 #TODO: Unconditional branches at the end of block
-#TODO: Remove stack-related instructions
-#TODO: Find out why label declaration table returns 'None'
-#TODO: Registers interpreted as %u%uX
-#TODO: In stmtChecks.py add support for '&&' and '||' in binary expressions
 
 # mapping -- a dictionary that maps string to int. Used to map identifiers to registers
 # types -- the list of types declared at the beginning of the json file
 # decls -- the list of global and local declarations for the function
-def transInstr(instr, llvmInstrList, currBlock, mapping,types,decls, funcCfg):
+def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls, 
+               funcCfg, milestone2 = False):
    # Insert return instruction if at the cfg exit block
    if len(currBlock.succrs) == 0:
       if funcCfg.returnType == "void":
@@ -23,7 +20,7 @@ def transInstr(instr, llvmInstrList, currBlock, mapping,types,decls, funcCfg):
    # check if guard for if/else or while statement
    if "guard" in instr:
       transBrInstr(instr["guard"], llvmInstrList, currBlock, mapping, 
-                   decls, types, funcCfg)
+                   decls, types, funcCfg, milestone2)
       # Break out of guard translation
       return
     
@@ -154,7 +151,8 @@ def transInstr(instr, llvmInstrList, currBlock, mapping,types,decls, funcCfg):
             f"\n{instr}")
 
 
-def transBrInstr(guard, llvmInstrList, currBlock, idToRegMap,decls,types,cfg):
+def transBrInstr(guard, llvmInstrList, currBlock, idToRegMap, decls, types,
+                 cfg, milestone2 = False):
    if len(currBlock.succrs) < 2:
       print("transInstr err: Cannot evaluate branch instruction. Too few" +
             f" successors to current block when evaluating guard {guard}")
@@ -169,7 +167,8 @@ def transBrInstr(guard, llvmInstrList, currBlock, idToRegMap,decls,types,cfg):
 # returns either the register of the identifier or expression, or the
 #   immediate value
 # exp types: id, num, binary, new, dot, invocation, read
-def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg):
+def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
+              milestone2 = False):
    resultReg = ""
    
    if expr["exp"] == "id":  # identifier
@@ -204,9 +203,9 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg):
       elif operator == "/":
          llvmInstr += "sdiv i32 "
       elif operator == "&&":
-         llvmInstr += "and i32 "
+         llvmInstr += "and i1 "
       elif operator == "||":
-         llvmInstr += "or i32 "
+         llvmInstr += "or i1 "
       else:
          print("getExpReg error: Unknown or unaccounted operator: '" +
                operator + "'")
@@ -305,7 +304,6 @@ def lookupStructType(target, decls, types):
    return None
 
 
-#TODO: multiple loads
 def getStructFieldReg(llvmInstrList, mapping, currBlock, target, decls, types,
                       withLoad = False):
    leftStructType = lookupStructType(target["left"], decls, types)
