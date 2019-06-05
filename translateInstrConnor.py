@@ -67,7 +67,7 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls,
                                         sourceReg)
          else:
             llvmTranslator.addLabelDecl(currBlock.label, targetId, 
-                                        int(sourceReg[2:]))
+                                        sourceReg)
 
          #mapping[targetId] = sourceReg
 
@@ -95,7 +95,7 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls,
                                         sourceReg)
          else:
             llvmTranslator.addLabelDecl(currBlock.label, "return", 
-                                        int(sourceReg[2:]))
+                                        sourceReg)
          #mapping["return"] = sourceReg
 
       #TODO: hope this doesn't break translation
@@ -176,7 +176,19 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
       #return mapping.get(expr["id"])
    if expr["exp"] == "num":  # immediate
       return expr["value"] 
-   if expr["exp"] == "binary":  # binary expr with a left and right side
+   if expr["exp"] == "unary":  # operator is only '-'
+      negatant = getExpReg(expr["operand"], llvmInstrList, mapping, currBlock,
+                           decls, types, cfg, milestone2)
+      resultReg = f"%u{llvmTranslator.getNextRegLabel()}"
+      llvmInstr = resultReg + " = "
+
+      if operator == "-":
+         llvmInstr += f"sub i32 0, {negatant}"
+      elif operator == "!":  # TODO: zext/trunc if type error
+         llvmInstr += f"xor i1 true, {negatant}"
+
+      llvmInstrList.append(llvmInstr)
+   elif expr["exp"] == "binary":  # binary expr with a left and right side
       resultReg = f"%u{llvmTranslator.getNextRegLabel()}"
       llvmInstr = resultReg + " = "
 
@@ -202,7 +214,7 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
          llvmInstr += "mul i32 "
       elif operator == "/":
          llvmInstr += "sdiv i32 "
-      elif operator == "&&":
+      elif operator == "&&":  # TODO: zext/trunc if type errors
          llvmInstr += "and i1 "
       elif operator == "||":
          llvmInstr += "or i1 "
@@ -215,14 +227,12 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
                            decls, types, cfg)
       rightSide = getExpReg(expr["rht"], llvmInstrList, mapping, currBlock,
                             decls, types, cfg)
-      llvmInstr += (f"{leftSide}, {rightSide}")
+      llvmInstr += f"{leftSide}, {rightSide}"
       llvmInstrList.append(llvmInstr)
    elif expr["exp"] == "new":
       # Get number of fields
       fieldCount = -1
       for typ in types:
-         #print(f"types: {types}")
-         #print(f"expr: {expr}\ntyp: {typ}")
          if expr["id"] == typ:
             fieldCount = len(types[typ]["fields"])
       if fieldCount == -1:
@@ -244,7 +254,6 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
                                  lookupLlvmType(expr, decls, types),
                                  structPtrReg))
    elif expr["exp"] == "invocation":
-      #TODO: Make sure invocation works
       resultReg = llvmTranslator.translateInstr(expr, currBlock,
                                     llvmInstrList, decls, types, cfg)
    elif expr["exp"] == "read":
