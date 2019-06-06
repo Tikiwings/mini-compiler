@@ -49,7 +49,7 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls,
                                        instr["target"], decls, types)
          
          llvmInstrList.append(f"store {targetType} {sourceReg}, " +
-                              f"{targetType}* %u{targetReg}")
+                              f"{targetType}* {targetReg}")
       else: # update mapping
          targetId = instr["target"]["id"]
          #print(f"mapping: {mapping}\nMapping dict index: {targetId}")
@@ -60,7 +60,11 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls,
          #llvmTranslator.addLabelDecl(currBlock.label, targetId, 
          #                            int(sourceReg[2:])) 
          # TODO: Make sure addLabelDecl can take an integer or bool immediate
-         if len(sourceReg) < 2 or sourceReg[:1] != "%":
+         print(f"&&Connor.trans: updating decl with register: {sourceReg}")
+         llvmTranslator.addLabelDecl(currBlock.label, targetId, 
+                                     sourceReg)
+
+         """if len(sourceReg) < 2 or sourceReg[:1] != "%":
             print("Connor.transInstr: Trying to add label decl for an " +
                   f"immediate: {sourceReg}")
             llvmTranslator.addLabelDecl(currBlock.label, targetId, 
@@ -68,7 +72,7 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls,
          else:
             llvmTranslator.addLabelDecl(currBlock.label, targetId, 
                                         sourceReg)
-
+         """
          #mapping[targetId] = sourceReg
 
    elif instrStmt == "delete":
@@ -88,14 +92,20 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls,
          #print("transInstr error: trying to write return value into mapping" +
          #      f" but can't.\nMapping is  {mapping}")
          # TODO: Make sure addLabelDecl can take an integer or bool immediate
-         if len(sourceReg) < 2 or sourceReg[:1] != "%":
+         print("&&#Connor.transInstr: return statement source register: "+
+               f"{sourceReg}")
+         llvmTranslator.addLabelDecl(currBlock.label, "return", 
+                                     sourceReg)
+
+         """if len(sourceReg) < 2 or sourceReg[:1] != "%":
             print("Connor.transInstr: Trying to add label decl for an " +
                   f"immediate: {sourceReg}")
             llvmTranslator.addLabelDecl(currBlock.label, "return", 
                                         sourceReg)
          else:
             llvmTranslator.addLabelDecl(currBlock.label, "return", 
-                                        sourceReg)
+                                     sourceReg)
+         """
          #mapping["return"] = sourceReg
 
       #TODO: hope this doesn't break translation
@@ -156,7 +166,6 @@ def transBrInstr(guard, llvmInstrList, currBlock, idToRegMap, decls, types,
    if len(currBlock.succrs) < 2:
       print("transInstr err: Cannot evaluate branch instruction. Too few" +
             f" successors to current block when evaluating guard {guard}")
-   #llvmInstrList.append(guardEvalInstr)
    guardEvalReg = getExpReg(guard, llvmInstrList, idToRegMap, currBlock,
                             decls, types, cfg)
    llvmInstrList.append(f"br i1 {guardEvalReg}, label "+
@@ -166,14 +175,13 @@ def transBrInstr(guard, llvmInstrList, currBlock, idToRegMap, decls, types,
 
 # returns either the register of the identifier or expression, or the
 #   immediate value
-# exp types: id, num, binary, new, dot, invocation, read
+# exp types: id, num, binary, new, dot, invocation, read, unary
 def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
               milestone2 = False):
    resultReg = ""
    
    if expr["exp"] == "id":  # identifier
       return llvmTranslator.lookupLabelDecl(currBlock, expr["id"])
-      #return mapping.get(expr["id"])
    if expr["exp"] == "num":  # immediate
       return expr["value"] 
    if expr["exp"] == "unary":  # operator is only '-'
@@ -181,7 +189,6 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
                            decls, types, cfg, milestone2)
       resultReg = f"%u{llvmTranslator.getNextRegLabel()}"
       llvmInstr = resultReg + " = "
-
 
       operator = expr["operator"]
       if operator == "-":
@@ -241,20 +248,20 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
          print("getExpReg error: Tried to create new " +
                f"{expr['id']}, but not in types.")
          
-      mallocReg = llvmTranslator.getNextRegLabel()
-      llvmInstrList.append(f"%u{mallocReg} = call i8* " +
+      mallocReg = f"%u{llvmTranslator.getNextRegLabel()}"
+      llvmInstrList.append(f"{mallocReg} = call i8* " +
                            f"@malloc(i32 {fieldCount * 4})")
       resultReg = f"%u{llvmTranslator.getNextRegLabel()}"
       llvmInstrList.append(f"{resultReg} = bitcast i8* " + 
-                           f"%u{mallocReg} to " + 
+                           f"{mallocReg} to " + 
                            f"%struct.{expr['id']}*")
    elif expr["exp"] == "dot":
       # TODO: If problem with dot expressions, refer here
       structPtrReg = getStructFieldReg(llvmInstrList, mapping, currBlock,
                                        expr, decls, types)
-      resultReg = "%u" + str(loadFromStructField(llvmInstrList, 
+      resultReg = loadFromStructField(llvmInstrList, 
                                  lookupLlvmType(expr, decls, types),
-                                 structPtrReg))
+                                 structPtrReg)
    elif expr["exp"] == "invocation":
       resultReg = llvmTranslator.translateInstr(expr, currBlock,
                                     llvmInstrList, decls, types, cfg)
@@ -319,9 +326,8 @@ def getStructFieldReg(llvmInstrList, mapping, currBlock, target, decls, types,
                       withLoad = False):
    leftStructType = lookupStructType(target["left"], decls, types)
    leftStructLlvmType = lookupLlvmType(target["left"], decls, types)
-   #rightType = lookupStructType(target, decls, types)
    rightLlvmType = lookupLlvmType(target, decls, types)
-   fieldReg = -1
+   fieldReg = ""
    if "left" in target["left"]:
       if withLoad:
          tmpFieldReg = getStructFieldReg(llvmInstrList, mapping, currBlock,
@@ -331,7 +337,8 @@ def getStructFieldReg(llvmInstrList, mapping, currBlock, target, decls, types,
       else:
          tmpFieldReg = getStructFieldReg(llvmInstrList, mapping, currBlock,
                                          target["left"], decls, types, True)
-         fieldReg = llvmTranslator.getNextRegLabel()
+         fieldReg = f"%u{llvmTranslator.getNextRegLabel()}"
+         
          # get field number
          fieldNum = -1
          for typ in types:
@@ -342,9 +349,9 @@ def getStructFieldReg(llvmInstrList, mapping, currBlock, target, decls, types,
          if fieldNum == -1:
             print("getStructFieldReg error: no type found for ")
 
-         llvmInstrList.append(f"%u{fieldReg} = getelementptr " +
+         llvmInstrList.append(f"{fieldReg} = getelementptr " +
                               f"{leftStructLlvmType} " +
-                              f"%u{tmpFieldReg}, " +
+                              f"{tmpFieldReg}, " +
                               f"i1 0, i32 {fieldNum}")
 
    else:
@@ -354,7 +361,8 @@ def getStructFieldReg(llvmInstrList, mapping, currBlock, target, decls, types,
          fieldReg = loadFromStructField(llvmInstrList, rightLlvmType, 
                                         tmpfieldReg)
       else:
-         fieldReg = llvmTranslator.getNextRegLabel()
+         fieldReg = f"%u{llvmTranslator.getNextRegLabel()}"
+         
          # get field number
          fieldNum = -1
          for typ in types:
@@ -368,7 +376,7 @@ def getStructFieldReg(llvmInstrList, mapping, currBlock, target, decls, types,
          structReg = llvmTranslator.lookupLabelDecl(currBlock, 
                                                     target['left']['id'])
          #structReg = mapping.get(target['left']['id'])
-         llvmInstrList.append(f"%u{fieldReg} = getelementptr " +
+         llvmInstrList.append(f"{fieldReg} = getelementptr " +
                               f"{leftStructLlvmType} " +
                               f"{structReg}, i1 0, i32 {fieldNum}")
 
@@ -376,7 +384,7 @@ def getStructFieldReg(llvmInstrList, mapping, currBlock, target, decls, types,
 
 
 def loadFromStructField(llvmInstrList, fieldType, fieldReg):
-   toReg = llvmTranslator.getNextRegLabel()
-   llvmInstrList.append(f"%u{toReg} = load {fieldType}* %u{fieldReg}")
+   toReg = f"%u{llvmTranslator.getNextRegLabel()}"
+   llvmInstrList.append(f"{toReg} = load {fieldType}* {fieldReg}")
    return toReg
 
