@@ -228,7 +228,7 @@ def transGlobals(globals):
    for var in globals:
       globType = var['type']
       if globType == "int" or globType == "bool":
-         globTypeStr = "i32"
+         globTypeStr = "i32*"
       else:
          globTypeStr = f"%struct.{globType}*"
       globStrs.append(f"@{var['id']} = common global {globTypeStr} null, align 4")

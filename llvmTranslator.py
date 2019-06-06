@@ -452,6 +452,10 @@ def addLabelDecl(label, var, regName):
    global labelDecls
    if not labelDecls.get(label):
       labelDecls[label] = dict()
+   
+   labelDecls[label][var] = regName
+
+   """
    if type(regName) == int:
       labelDecls[label][var] = f"%u{regName}"
    else:
@@ -459,6 +463,7 @@ def addLabelDecl(label, var, regName):
          labelDecls[label][var] = regName
       else:
          labelDecls[label][var] = "%" + regName 
+   """
 
 def initVar(label, var):
    global labelDecls
@@ -641,7 +646,8 @@ def translateInstrs(cfg, globals_and_locals, structTypes):
       initVar(cfg.entry.label, var)
       addFuncSymEntry(cfg.funcName, var, globals_and_locals[var])
    for param in cfg.params:
-      addLabelDecl(cfg.entry.label, param['id'], param['id'] )
+      #addLabelDecl(cfg.entry.label, param['id'], param['id'] )
+      addLabelDecl(cfg.entry.label, param['id'], "%" + param['id'] )
       addFuncSymEntry(cfg.funcName, param['id'], param)
    addFuncSymEntry(cfg.funcName, 'return', {'type' : cfg.returnType})
 
