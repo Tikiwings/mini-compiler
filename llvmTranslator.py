@@ -889,7 +889,7 @@ class funcLlvm:
       print(f"localSyms: \n{cfg.localDecls}")
       self.instrs = translateInstrs(
             cfg, 
-            combineDict(globalSyms, declListToDict(cfg.localDecls)), 
+            combineDict(combineDict(globalSyms, declListToDict(cfg.localDecls)),declListToDict(cfg.params)), 
             structTypes)
       #self.closeBlock = "}"
    """
