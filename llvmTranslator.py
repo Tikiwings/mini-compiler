@@ -466,14 +466,25 @@ def translateInstr(instr, block, llvmInstrs, globals_and_locals, structTypes, cf
       if  getLabelDeclTable(block.label) == None:
          #print(f"ERROR: empty mapping:\n\tblock: {block.label}\ninstr:{instr}")
          print(f"block {block.label} decls : {getLabelDeclTable(block.label)}")
-      return translateInstrConnor.transInstr(
-            instr, 
-            llvmInstrs, 
-            block,
-            getLabelDeclTable(block.label),
-            structTypes,
-            globals_and_locals,
-            cfg) #curBlock, #mapping, #types, #decls
+      if getPrintType() == "stack":
+         return translateInstrConnor.transInstr(
+               instr, 
+               llvmInstrs, 
+               block,
+               getLabelDeclTable(block.label),
+               structTypes,
+               globals_and_locals,
+               cfg,
+               milestone2 = True) 
+      else:
+         return translateInstrConnor.transInstr(
+               instr, 
+               llvmInstrs, 
+               block,
+               getLabelDeclTable(block.label),
+               structTypes,
+               globals_and_locals,
+               cfg) 
    """
    elif instrType == "boolean":
       pass
