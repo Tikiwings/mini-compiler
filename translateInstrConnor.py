@@ -1,7 +1,5 @@
 import llvmTranslator
 
-#TODO: Unconditional branches at the end of block
-
 # mapping -- a dictionary that maps string to int. Used to map identifiers to registers
 # types -- the list of types declared at the beginning of the json file
 # decls -- the list of global and local declarations for the function
@@ -11,12 +9,20 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls,
    
    # Insert return instruction if at the cfg exit block
    if len(currBlock.succrs) == 0:
+      #TODO: Ask Donnie if he handles void return statements
       if funcCfg.returnType == "void":
-         llvmInstrList.append("ret void")
+         #llvmInstrList.append("ret void")
+         pass
       else:
-         retReg = llvmTranslator.lookupLabelDecl(currBlock, 'return')
-         retInstr = f"ret {convertLlvmType(funcCfg.returnType)} {retReg}"
-         llvmInstrList.append(retInstr)
+         if milestone2:
+            retType = convertLlvmType(funcCfg.returnType)
+            retReg = f"%u{llvmTranslator.getNextRegLabel()}"
+            llvmInstrList.append(f"{retReg} = load {retType}* %_retval_")
+            llvmInstrList.append(f"ret {retType} {retReg}")
+         else:
+            retReg = llvmTranslator.lookupLabelDecl(currBlock, 'return')
+            retInstr = f"ret {convertLlvmType(funcCfg.returnType)} {retReg}"
+            llvmInstrList.append(retInstr)
       return
 
    # check if guard for if/else or while statement
@@ -32,7 +38,7 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls,
    # Check if passed an expression
    if "stmt" not in instr:
       return getExpReg(instr, llvmInstrList, mapping, currBlock, decls, types,
-                       funcCfg)
+                       funcCfg, milestone2)
 
    # Translate STATEMENT
    instrStmt = instr["stmt"]
@@ -41,44 +47,34 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls,
       ###################################################
       # translate source
       sourceReg = getExpReg(instr["source"], llvmInstrList, mapping, 
-                            currBlock, decls, types, funcCfg)
+                            currBlock, decls, types, funcCfg, milestone2)
 
       ###################################################
       # translate target
+      targetType = lookupLlvmType(instr["target"], decls, types, currBlock)
+
       if "left" in instr["target"]: # store source in struct field
          targetType = lookupLlvmType(instr["target"], decls, types, currBlock)
          targetReg = getStructFieldReg(llvmInstrList, mapping, currBlock,
-                                       instr["target"], decls, types)
+                                       instr["target"], decls, types,
+                                       milestone2)
          
          llvmInstrList.append(f"store {targetType} {sourceReg}, " +
                               f"{targetType}* {targetReg}")
-      else: # update mapping
+      else: # update block declarations
          targetId = instr["target"]["id"]
-         #print(f"mapping: {mapping}\nMapping dict index: {targetId}")
-         #print("transInstr error: trying to write value into mapping" +
-         #      f" but can't.\n    Mapping is  {mapping}\n    " +
-         #      f"Mapping key is  {targetId}")
 
-         #llvmTranslator.addLabelDecl(currBlock.label, targetId, 
-         #                            int(sourceReg[2:])) 
-         # TODO: Make sure addLabelDecl can take an integer or bool immediate
-         llvmTranslator.addLabelDecl(currBlock.label, targetId, 
-                                     sourceReg)
-
-         """if len(sourceReg) < 2 or sourceReg[:1] != "%":
-            print("Connor.transInstr: Trying to add label decl for an " +
-                  f"immediate: {sourceReg}")
-            llvmTranslator.addLabelDecl(currBlock.label, targetId, 
-                                        sourceReg)
+         if milestone2:
+            storeInstr = (f"store {targetType} {sourceReg}, {targetType}* " +
+                          f"%{targetId}")
+            llvmInstrList.append(storeInstr)
          else:
             llvmTranslator.addLabelDecl(currBlock.label, targetId, 
                                         sourceReg)
-         """
-         #mapping[targetId] = sourceReg
 
    elif instrStmt == "delete":
       sourceReg = getExpReg(instr["exp"], llvmInstrList, mapping, 
-                            currBlock, decls, types, funcCfg)
+                            currBlock, decls, types, funcCfg, milestone2)
       sourceType = lookupLlvmType(instr["exp"], decls, types, currBlock)
       bitcastReg = f"%u{llvmTranslator.getNextRegLabel()}"
       
@@ -89,25 +85,15 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls,
       if "exp" in instr:
          #sourceType = lookupLlvmType(instr["exp"], decls, types)
          sourceReg = getExpReg(instr["exp"], llvmInstrList, mapping,
-                               currBlock, decls, types, funcCfg)
-         #print("transInstr error: trying to write return value into mapping" +
-         #      f" but can't.\nMapping is  {mapping}")
-         # TODO: Make sure addLabelDecl can take an integer or bool immediate
-         llvmTranslator.addLabelDecl(currBlock.label, "return", 
-                                     sourceReg)
-
-         """if len(sourceReg) < 2 or sourceReg[:1] != "%":
-            print("Connor.transInstr: Trying to add label decl for an " +
-                  f"immediate: {sourceReg}")
-            llvmTranslator.addLabelDecl(currBlock.label, "return", 
-                                        sourceReg)
+                               currBlock, decls, types, funcCfg, milestone2)
+         if milestone2:
+            retType = convertLlvmType(funcCfg.returnType)
+            storeInstr = f"store {retType} {sourceReg}, {retType}* %_retval_"
+            llvmInstrList.append(storeInstr)
          else:
             llvmTranslator.addLabelDecl(currBlock.label, "return", 
-                                     sourceReg)
-         """
-         #mapping["return"] = sourceReg
+                                        sourceReg)
 
-      #TODO: hope this doesn't break translation
       exitBlock = currBlock
       # Locate the CFG exit block
       while len(exitBlock.succrs) > 0:
@@ -117,10 +103,12 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls,
       # that it must be translated. 
       # TODO: I'm hoping this will also work with the phi instructions.
       # Depending on how phi instructions are handled, this may need changing
-      exitBlock.instrs.append(instr)
+      
+      if len(exitBlock.instrs) == 0:
+         exitBlock.instrs.append(instr)
    elif instrStmt == "print":
       sourceReg = getExpReg(instr["exp"], llvmInstrList, mapping, currBlock,
-                            decls, types, funcCfg)
+                            decls, types, funcCfg, milestone2)
 
       # Start off the print instruction
       printInstr = ("call i32 (i8*, ...)* @printf(i8* getelementptr " +
@@ -166,7 +154,7 @@ def transBrInstr(guard, llvmInstrList, currBlock, idToRegMap, decls, types,
       print("&&&Connor.transBrInstr err: Cant evaluate branch instruction."+
             f"  Too few succrs to current block when evaluating guard {guard}")
    guardEvalReg = getExpReg(guard, llvmInstrList, idToRegMap, currBlock,
-                            decls, types, cfg)
+                            decls, types, cfg, milestone2)
    llvmInstrList.append(f"br i1 {guardEvalReg}, label "+
                         f"%LU{currBlock.succrs[0].label}, label "+
                         f"%LU{currBlock.succrs[1].label}")
@@ -180,7 +168,16 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
    resultReg = ""
    
    if expr["exp"] == "id":  # identifier
-      return llvmTranslator.lookupLabelDecl(currBlock, expr["id"])
+      if milestone2:
+         #TODO: if problems with null, refer here
+         loadToReg = f"%u{llvmTranslator.getNextRegLabel()}"
+         exprType = lookupLlvmType(expr, decls, types, currBlock)
+         loadFromReg = llvmTranslator.lookupLabelDecl(currBlock, expr['id'])
+         llvmInstrList.append(f"{loadToReg} = load {exprType}* {loadFromReg}")
+
+         return loadToReg
+      else:
+         return llvmTranslator.lookupLabelDecl(currBlock, expr["id"])
    if expr["exp"] == "num":  # immediate
       return expr["value"] 
    if expr["exp"] == "null":
@@ -202,18 +199,9 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
       resultReg = f"%u{llvmTranslator.getNextRegLabel()}"
       llvmInstr = resultReg + " = "
 
-      """
-      operandType = lookupLlvmType(expr['lft'], decls, types, currBlock)
-      if operandType == None:
-         operandType = lookupLlvmType(expr['rht'], decls, types, currBlock)
-         if operandType == None:
-            print("&&&Connor.getExpReg: No type for either operand in expr:\n"+
-                  f"   {expr}")
-      """
       #print(f"&&&Connor.getExpReg: translating expr:\n   {expr}")
 
       operator = expr["operator"]
-      # eq, ne, sgt, sge, slt, sle
       if operator == "<=":
          llvmInstr += "icmp sle i32 "
       elif operator == ">=":
@@ -228,9 +216,7 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
             operandType = lookupLlvmType(expr['rht'], decls, types, currBlock)
             if operandType == None:
                print("&&&Connor.getExpReg: No type for either operand in expr:\n"+
-                     f"   {expr}")
-         
-
+                     f"   {expr}")      
          llvmInstr += f"icmp eq {operandType} "
       elif operator == "!=":
          operandType = lookupLlvmType(expr['lft'], decls, types, currBlock)
@@ -239,8 +225,6 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
             if operandType == None:
                print("&&&Connor.getExpReg: No type for either operand in expr:\n"+
                      f"   {expr}")
-         
-
          llvmInstr += f"icmp ne {operandType} "
       elif operator == "-":
          llvmInstr += "sub i32 "
@@ -259,9 +243,9 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
          print(f"   in expression: {expr}")
 
       leftSide = getExpReg(expr["lft"], llvmInstrList, mapping, currBlock,
-                           decls, types, cfg)
+                           decls, types, cfg, milestone2)
       rightSide = getExpReg(expr["rht"], llvmInstrList, mapping, currBlock,
-                            decls, types, cfg)
+                            decls, types, cfg, milestone2)
       llvmInstr += f"{leftSide}, {rightSide}"
       llvmInstrList.append(llvmInstr)
    elif expr["exp"] == "new":
