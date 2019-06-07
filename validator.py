@@ -289,7 +289,7 @@ def main():
    
    #don't print if flag is not set
    if not getPrintFlag():
-      sys.exit(1)
+      sys.exit(0)
 
    #print(structTable)
    #print(symTable)
@@ -369,6 +369,7 @@ declare i32 @scanf(i8*, ...)
       print("=======================================================")
    '''
    llvmFile.close()
+   return 0 
 
 if __name__ == "__main__":
    main()

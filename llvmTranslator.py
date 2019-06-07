@@ -311,6 +311,9 @@ def transInvoc(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg):
             paramTypes[i] = lookupLlvmType(getFuncSymType(getCurFunc(), instr['args'][i]['id']))
          elif instr['args'][i]['exp'] == 'invocation':
             paramTypes[i] = lookupLlvmType(getFuncTable()[instr['args'][i]['id']]['return_type'])
+         elif instr['args'][i]['exp'] == 'dot':
+            #paramTypes[i] = lookupLabelDecl(getDotType(instr, globals_and_locals, structTypes))
+            paramTypes[i] = lookupLlvmType(translateInstrConnor.lookupStructType(instr['args'][i], globals_and_locals, structTypes, block))
          else:
             paramTypes[i] = 'i32'
 
@@ -356,6 +359,18 @@ def transAlloc():
 
 def transMisc():
    return ""
+"""
+def getDotType(instr, globals_and_locals, structTypes):
+   dotType = None
+   leftList = list()
+
+   while instr['exp'] == 'dot':
+      leftList.append(instr['id'])
+      instr = instr['left']
+"""
+
+
+
 
 #TODO instruction may be dict({guard: instr})
 def lookupInstrType(instr):
