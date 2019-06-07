@@ -7,6 +7,8 @@ import llvmTranslator
 # decls -- the list of global and local declarations for the function
 def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls, 
                funcCfg, milestone2 = False):
+   #print(f"&&&Connor.transInstr: decls:\n   {decls}")
+   
    # Insert return instruction if at the cfg exit block
    if len(currBlock.succrs) == 0:
       if funcCfg.returnType == "void":
@@ -44,7 +46,7 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls,
       ###################################################
       # translate target
       if "left" in instr["target"]: # store source in struct field
-         targetType = lookupLlvmType(instr["target"], decls, types)
+         targetType = lookupLlvmType(instr["target"], decls, types, currBlock)
          targetReg = getStructFieldReg(llvmInstrList, mapping, currBlock,
                                        instr["target"], decls, types)
          
@@ -60,7 +62,6 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls,
          #llvmTranslator.addLabelDecl(currBlock.label, targetId, 
          #                            int(sourceReg[2:])) 
          # TODO: Make sure addLabelDecl can take an integer or bool immediate
-         print(f"&&Connor.trans: updating decl with register: {sourceReg}")
          llvmTranslator.addLabelDecl(currBlock.label, targetId, 
                                      sourceReg)
 
@@ -78,7 +79,7 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls,
    elif instrStmt == "delete":
       sourceReg = getExpReg(instr["exp"], llvmInstrList, mapping, 
                             currBlock, decls, types, funcCfg)
-      sourceType = lookupLlvmType(instr["exp"], decls, types)
+      sourceType = lookupLlvmType(instr["exp"], decls, types, currBlock)
       bitcastReg = f"%u{llvmTranslator.getNextRegLabel()}"
       
       llvmInstrList.append(bitcastReg + f" = bitcast {sourceType} " +
@@ -92,8 +93,6 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls,
          #print("transInstr error: trying to write return value into mapping" +
          #      f" but can't.\nMapping is  {mapping}")
          # TODO: Make sure addLabelDecl can take an integer or bool immediate
-         print("&&#Connor.transInstr: return statement source register: "+
-               f"{sourceReg}")
          llvmTranslator.addLabelDecl(currBlock.label, "return", 
                                      sourceReg)
 
@@ -157,15 +156,15 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls,
       """
       pass
    else:
-      print(f"transInstr err: Unrecognized statement '{instrStmt}' in instr:" +
-            f"\n{instr}")
+      print(f"&&&Connor.transInstr err: Unrecognized statement '{instrStmt}'"+
+            f"\nin instr: {instr}")
 
 
 def transBrInstr(guard, llvmInstrList, currBlock, idToRegMap, decls, types,
                  cfg, milestone2 = False):
    if len(currBlock.succrs) < 2:
-      print("transInstr err: Cannot evaluate branch instruction. Too few" +
-            f" successors to current block when evaluating guard {guard}")
+      print("&&&Connor.transBrInstr err: Cant evaluate branch instruction."+
+            f"  Too few succrs to current block when evaluating guard {guard}")
    guardEvalReg = getExpReg(guard, llvmInstrList, idToRegMap, currBlock,
                             decls, types, cfg)
    llvmInstrList.append(f"br i1 {guardEvalReg}, label "+
@@ -184,6 +183,8 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
       return llvmTranslator.lookupLabelDecl(currBlock, expr["id"])
    if expr["exp"] == "num":  # immediate
       return expr["value"] 
+   if expr["exp"] == "null":
+      return 'null'
    if expr["exp"] == "unary":  # operator is only '-'
       negatant = getExpReg(expr["operand"], llvmInstrList, mapping, currBlock,
                            decls, types, cfg, milestone2)
@@ -201,6 +202,16 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
       resultReg = f"%u{llvmTranslator.getNextRegLabel()}"
       llvmInstr = resultReg + " = "
 
+      """
+      operandType = lookupLlvmType(expr['lft'], decls, types, currBlock)
+      if operandType == None:
+         operandType = lookupLlvmType(expr['rht'], decls, types, currBlock)
+         if operandType == None:
+            print("&&&Connor.getExpReg: No type for either operand in expr:\n"+
+                  f"   {expr}")
+      """
+      #print(f"&&&Connor.getExpReg: translating expr:\n   {expr}")
+
       operator = expr["operator"]
       # eq, ne, sgt, sge, slt, sle
       if operator == "<=":
@@ -212,9 +223,25 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
       elif operator == "<":
          llvmInstr += "icmp slt i32 "
       elif operator == "==":
-         llvmInstr += "icmp eq i32 "
+         operandType = lookupLlvmType(expr['lft'], decls, types, currBlock)
+         if operandType == None:
+            operandType = lookupLlvmType(expr['rht'], decls, types, currBlock)
+            if operandType == None:
+               print("&&&Connor.getExpReg: No type for either operand in expr:\n"+
+                     f"   {expr}")
+         
+
+         llvmInstr += f"icmp eq {operandType} "
       elif operator == "!=":
-         llvmInstr += "icmp ne i32 "
+         operandType = lookupLlvmType(expr['lft'], decls, types, currBlock)
+         if operandType == None:
+            operandType = lookupLlvmType(expr['rht'], decls, types, currBlock)
+            if operandType == None:
+               print("&&&Connor.getExpReg: No type for either operand in expr:\n"+
+                     f"   {expr}")
+         
+
+         llvmInstr += f"icmp ne {operandType} "
       elif operator == "-":
          llvmInstr += "sub i32 "
       elif operator == "+":
@@ -228,9 +255,8 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
       elif operator == "||":
          llvmInstr += "or i1 "
       else:
-         print("getExpReg error: Unknown or unaccounted operator: '" +
-               operator + "'")
-         print(f"in expression: {expr}")
+         print(f"getExpReg error: Unknown or unaccounted operator: {operator}")
+         print(f"   in expression: {expr}")
 
       leftSide = getExpReg(expr["lft"], llvmInstrList, mapping, currBlock,
                            decls, types, cfg)
@@ -245,7 +271,7 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
          if expr["id"] == typ:
             fieldCount = len(types[typ]["fields"])
       if fieldCount == -1:
-         print("getExpReg error: Tried to create new " +
+         print("&&&Connor.getExpReg error: Tried to create new " +
                f"{expr['id']}, but not in types.")
          
       mallocReg = f"%u{llvmTranslator.getNextRegLabel()}"
@@ -260,8 +286,8 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
       structPtrReg = getStructFieldReg(llvmInstrList, mapping, currBlock,
                                        expr, decls, types)
       resultReg = loadFromStructField(llvmInstrList, 
-                                 lookupLlvmType(expr, decls, types),
-                                 structPtrReg)
+                            lookupLlvmType(expr, decls, types, currBlock),
+                            structPtrReg)
    elif expr["exp"] == "invocation":
       resultReg = llvmTranslator.translateInstr(expr, currBlock,
                                     llvmInstrList, decls, types, cfg)
@@ -272,15 +298,25 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
       resultReg = f"%u{llvmTranslator.getNextRegLabel()}"
       llvmInstrList.append(f"{resultReg} = load i32* @.read_scratch")
    else:
-      print("getExpReg error: Unrecognized expression type '" + expr["exp"] +
-            f"' in expression: {expr}")
+      print("Connor.getExpReg error: Unrecognized expression type\n  " +
+            f"'{expr['exp']}' in expression: {expr}")
 
    return resultReg
 
 
-def lookupLlvmType(target, decls, types):
-   miniType = lookupStructType(target, decls, types)
-   
+def lookupLlvmType(target, decls, types, currBlock):
+   if "exp" in target and target["exp"] == "null":
+      return None
+   #if target['exp'] == 'num':
+   #   return 'i32'
+
+   miniType = lookupStructType(target, decls, types, currBlock)
+  
+   if miniType == None:
+      print("&&&Connor.lookupLlvmType ERROR: 'None' returned from " +
+            "Connor.lookupStructType.\n    No type was found for " +
+            f"argument {target}")
+
    return convertLlvmType(miniType)
 
 
@@ -290,33 +326,31 @@ def convertLlvmType(miniType):
    elif miniType == "void":
       return "void"
    elif miniType == None:
-      print("Connor.convertLlvmType ERROR: 'None' returned from " +
-            "Connor.lookupStructType.\n    No type was found for " +
-            f"argument {miniType}")
       return "i32"
    else:
       return f"%struct.{miniType}*"
 
 
-def lookupStructType(target, decls, types):
+def lookupStructType(target, decls, types, currBlock):
+   #print(f"&&&Running lookupStructType on target:\n   {target}")
    if "left" in target:
-      leftStructType = lookupStructType(target["left"], decls, types)
+      leftStructType = lookupStructType(target["left"],decls,types, currBlock)
       for typ in types:
          if typ == leftStructType:
             for field in types[typ]["fields"]:
                if field["id"] == target["id"]:
                   return field["type"]
       # none of the types' fields matched the target's left identifier
-      print("getStructType Error: Could not find type for left of target: \n" +
-            f"    {target}\n    within types: \n    {types}")
+      print("&&&Connor.lookupStructType err: Could not find type for" +
+            f"left of target:\n    {target}\n    within types: \n    {types}")
 
    else:
       for decl in decls:
          if decl == target["id"]:
             return decls[decl]["type"]
       # no declaration matched target's identifier
-      print("getStructType Error: Could not find type for target: \n    " +
-            f"{target}\n    within declarations:\n    {decls}")
+      print("&&&Connor.lookupStructType Error: Could not find type for"+
+            f" target:\n   {target}\n    within declarations:\n    {decls}")
 
    # If no types came up from looking in the types, return None
    return None
@@ -324,9 +358,9 @@ def lookupStructType(target, decls, types):
 
 def getStructFieldReg(llvmInstrList, mapping, currBlock, target, decls, types,
                       withLoad = False):
-   leftStructType = lookupStructType(target["left"], decls, types)
-   leftStructLlvmType = lookupLlvmType(target["left"], decls, types)
-   rightLlvmType = lookupLlvmType(target, decls, types)
+   leftStructType = lookupStructType(target["left"], decls, types, currBlock)
+   leftStructLlvmType = lookupLlvmType(target["left"], decls, types, currBlock)
+   rightLlvmType = lookupLlvmType(target, decls, types, currBlock)
    fieldReg = ""
    if "left" in target["left"]:
       if withLoad:
@@ -347,7 +381,8 @@ def getStructFieldReg(llvmInstrList, mapping, currBlock, target, decls, types,
                   if types[typ]["fields"][i]["id"] == target["id"]:
                      fieldNum = i
          if fieldNum == -1:
-            print("getStructFieldReg error: no type found for ")
+            print("&&&Connor.getStructFieldReg err: no type found for "+
+                  f"expression: {target}\n   within types: {types}")
 
          llvmInstrList.append(f"{fieldReg} = getelementptr " +
                               f"{leftStructLlvmType} " +
@@ -371,11 +406,11 @@ def getStructFieldReg(llvmInstrList, mapping, currBlock, target, decls, types,
                   if types[typ]["fields"][i]["id"] == target["id"]:
                      fieldNum = i
          if fieldNum == -1:
-            print("getStructFieldReg error: no type found for ")
+            print("&&&Connor.getStructFieldReg err: no type found for "+
+                  f"expression: {target}\n   within types: {types}")
 
          structReg = llvmTranslator.lookupLabelDecl(currBlock, 
                                                     target['left']['id'])
-         #structReg = mapping.get(target['left']['id'])
          llvmInstrList.append(f"{fieldReg} = getelementptr " +
                               f"{leftStructLlvmType} " +
                               f"{structReg}, i1 0, i32 {fieldNum}")
