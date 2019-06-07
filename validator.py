@@ -26,14 +26,21 @@ def getGlobalDecls(prog, symTable):
 
 #=================================Flags==========================================
 printLlvm = False
+printType = None
 
-def setPrintFlag():
+def setPrintFlag(pType):
    global printLlvm
+   global printType
    printLlvm = True
+   printType = pType
 
 def getPrintFlag():
    global printLlvm
    return printLlvm
+
+def getPrintType():
+   global printType
+   return printType
 
 #================================================================================
 
@@ -209,7 +216,10 @@ def parseArgs():
    args = sys.argv.copy()
    if "-stack" in sys.argv:
       args.remove("-stack")
-      setPrintFlag()
+      setPrintFlag("stack")
+   elif "-ssa" in sys.argv:
+      args.remove("-ssa")
+      setPrintFlag("ssa")
    return args[1]
 
 
@@ -289,7 +299,8 @@ def main():
          progCfg, 
          symTable["__global__"],
          structTable,
-         funTable)
+         funTable,
+         getPrintType())
 
    print("#####################################")
    print("###########Llvm Prog#################")

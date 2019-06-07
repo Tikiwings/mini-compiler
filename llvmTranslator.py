@@ -69,6 +69,12 @@ Misc:
 
 """
 ##############GLOBALS#########
+#current function being looked at
+curFunc = None
+
+#global type of printing (stack / ssa)
+printType = "stack"
+
 #global register counter
 regLabel = 0
 
@@ -95,6 +101,14 @@ def getFuncSymType(funcId, varId):
       return funcSymTable[funcId][varId].get('type')
    return None
 
+def getPrintType():
+   global printType
+   return printType
+
+def getCurFunc():
+   global curFunc
+   return curFunc
+
 
 #global mutator methods
 def addVisited(label):
@@ -110,11 +124,34 @@ def addFuncSymEntry(funcId, symName, sym):
    if not funcSymTable.get(funcId):
       funcSymTable[funcId] = dict()
    funcSymTable[funcId][symName] = sym
+
+def setPrintType(pType):
+   global printType
+   printType = pType
+
+def setCurFunc(funcName):
+   global curFunc
+   curFunc = funcName
+
 ##############################
+
+def storeVar(funcId, varName, llvmInstrs):
+   pass
+
+def loadVar(funcId, varName, llvmInstrs):
+   loadReg = getNextRegLabel()
+
+   loadType = lookupLlvmType(getFuncSymType(funcId, varName))
+
+   llvmInstrs.append(f"%u{loadReg} = load {loadType}* %{varName}")
+
+   return f"%u{loadReg}"
 
 
 def transArith(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg):
-   #instrs = []
+   
+   printType = getPrintType()
+
    op = instr['operator']
    #resultReg = getNextRegLabel()
 
@@ -125,7 +162,10 @@ def transArith(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg):
    if lhsType == "num":
       lhs = instr['lft']['value']
    elif lhsType == "id":
-      lhs = lookupLabelDecl(block, instr['lft']['id'], instrType = "i32")
+      if printType == "stack":
+         lhs = loadVar(getCurFunc(), instr['lft']['id'], llvmInstrs)
+      else:
+         lhs = lookupLabelDecl(block, instr['lft']['id'], instrType = "i32")
    elif lhsType == "unary":
       lhsInstr = instr['lft']
       negation = False
@@ -136,7 +176,10 @@ def transArith(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg):
       if lhsInstr.get('exp') == "num":
          lhs = lhsInstr['value']
       elif lhsInstr.get('exp') == "id":
-         lhs = lookupLabelDecl(block, lhsInstr['id'], instrType = "i32")
+         if printType == "stack":
+            lhs = loadVar(getCurFunc(), lhsInstr['id'], llvmInstrs)
+         else:
+            lhs = lookupLabelDecl(block, lhsInstr['id'], instrType = "i32")
       if negation:
          lhs = "-" + lhs
          
@@ -145,7 +188,10 @@ def transArith(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg):
    if rhsType == "num":
       rhs = instr['rht']['value']
    elif rhsType == "id":
-      rhs = lookupLabelDecl(block, instr['rht']['id'], instrType = "i32")
+      if printType == "stack":
+         rhs = loadVar(getCurFunc(), instr['rht']['id'], llvmInstrs)
+      else:
+         rhs = lookupLabelDecl(block, instr['rht']['id'], instrType = "i32")
    elif rhsType == "unary":
       rhsInstr = instr['rht']
       negation = False
@@ -156,7 +202,10 @@ def transArith(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg):
       if rhsInstr.get('exp') == "num":
          rhs = rhsInstr['value']
       elif rhsInstr.get('exp') == "id":
-         rhs = lookupLabelDecl(block, rhsInstr['id'], instrType = "i32")
+         if printType == "stack":
+            rhs = loadVar(getCurFunc(), rhsInstr['rht']['id'], llvmInstrs)
+         else:
+            rhs = lookupLabelDecl(block, rhsInstr['id'], instrType = "i32")
       if negation:
          rhs = "-" + rhs
 
@@ -181,7 +230,7 @@ def transBool():
    return ""
 
 def transCmp(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg):
-   #instrs = []
+   printType = getPrintType()
    op = instr["operator"]
    
    if op == "==":
@@ -212,19 +261,21 @@ def transCmp(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg):
    if lhsType == "num":
       lhs = instr['lft']['value']
    elif lhsType == "id":
-      #lhs = f"%u{lookupLabelDecl(block, instr['lft']['id'])}"
-      lhs = lookupLabelDecl(block, instr['lft']['id'], instrType = "i32")
+      if printType == "stack":
+         lhs = loadVar(getCurFunc(), instr['lft']['id'], llvmInstrs)
+      else:
+         lhs = lookupLabelDecl(block, instr['lft']['id'], instrType = "i32")
    else:
-      #lhs = "###"
-      #print(f"lhs of line: {instr['line']} not num or id. -> {instr}")
       lhs = translateInstr(instr['lft'], block, llvmInstrs, globals_and_locals, structTypes, cfg)
 
 
    if rhsType == "num":
       rhs = instr['rht']['value']
    elif rhsType == "id":
-      #rhs = f"%u{lookupLabelDecl(block, instr['rht']['id'])}"
-      rhs = lookupLabelDecl(block, instr['rht']['id'], instrType = "i32")
+      if printType == "stack":
+         rhs = loadVar(getCurFunc(), instr['rht']['id'], llvmInstrs)
+      else:
+         rhs = lookupLabelDecl(block, instr['rht']['id'], instrType = "i32")
    else:
       #rhs = "###"
       #print(f"rhs of line: {instr['line']} not num or id. -> {instr}")
@@ -239,35 +290,36 @@ def transCmp(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg):
 
    return f"%u{target}"
 
-def transBr():
-   return ""
-
-def transLoad():
-   return ""
-
-def transStore():
-   return ""
 
 #recursive version with more abstraction
 #if in paramRegs/imm is a string then its a register of it is an int then it is an imm
 #params can only be arithmetic, nums, bools, invocations
 def transInvoc(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg):
    paramRegs = [None] * len(instr['args'])
+   paramTypes = [None] * len(instr['args'])
    invocRetType = getFuncTable()[instr['id']]['return_type']
 
    for i in range(len(instr["args"])):
       if instr["args"][i] == "invocation":
          paramRegs[i] = transInvoc(instr["args"][i], block, llvmInstrs, globals_and_locals, structTypes, cfg)
+         paramTypes[i] = getFuncTable()[instr['args'][i]['id']]['return_type']
 
       else:
          #paramRegs[i] = getNextRegLabel()
          paramRegs[i] = translateInstr(instr['args'][i], block, llvmInstrs, globals_and_locals, structTypes, cfg)
+         if instr['args'][i]['exp'] == 'id':
+            paramTypes[i] = lookupLlvmType(getFuncSymType(getCurFunc(), instr['args'][i]['id']))
+         elif instr['args'][i]['exp'] == 'invocation':
+            paramTypes[i] = lookupLlvmType(getFuncTable()[instr['args'][i]['id']]['return_type'])
+         else:
+            paramTypes[i] = 'i32'
 
+         
    paramStr = """"""
    for i in range(len(paramRegs)):
       if i != 0 and i != len(paramRegs):
          paramStr += ", "
-      paramStr += f"i32 {paramRegs[i]}"
+      paramStr += f"{paramTypes[i]} {paramRegs[i]}"
    resultReg = getNextRegLabel()
 
    if invocRetType == "void":
@@ -347,6 +399,9 @@ def lookupInstrType(instr):
 
    elif instrType == "num":
       return "num"
+   
+   elif instrType == "id":
+      return "id"
 
    elif instrType == "null":
       return "null"
@@ -389,6 +444,12 @@ def translateInstr(instr, block, llvmInstrs, globals_and_locals, structTypes, cf
 
    elif instrType == "null":
       return "null"
+
+   elif instrType == "id":
+      if getPrintType() == "stack":
+         return loadVar(getCurFunc(), instr['id'], llvmInstrs)
+      else:
+         return lookupLabelDecl(block, instr['id'])
 
    elif instrType == "unary":
       return transUnary(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg)
@@ -634,9 +695,9 @@ def translateInstrs(cfg, globals_and_locals, structTypes):
       llvmInstrs.append(f"store {llvmType} %{paramId}, {llvmType}* %_P_{paramId}")
    """
 
-   #TODO finish translating rest of the blocks instructions and each successor block 
-   #iterate through all instructions
-
+   #set current working function
+   setCurFunc(cfg.funcName)
+   
    #Get list of all blocks to iterate through
    blockList = getAllBlocks(cfg)
 
@@ -651,11 +712,30 @@ def translateInstrs(cfg, globals_and_locals, structTypes):
       addFuncSymEntry(cfg.funcName, param['id'], param)
    addFuncSymEntry(cfg.funcName, 'return', {'type' : cfg.returnType})
 
+   if getPrintType() == "stack":
+      if cfg.returnType != "void":
+         retType = lookupLlvmType(cfg.returnType)
+         llvmInstrs.append(f"%_retval_ = alloca {retType}")
+
+      for param in cfg.params:
+         paramType = lookupLlvmType(param['type'])
+         llvmInstrs.append(f"%{param['id']} = alloca {paramType}")
+
+      for local in cfg.localDecls:
+         localType = lookupLlvmType(local['type'])
+         llvmInstrs.append(f"%{local['id']} = alloca {localType}")
+
+      for param in cfg.params:
+         paramType = lookupLlvmType(param['type'])
+         llvmInstrs.append(f"store {paramType} %_P_{param['id']}, {paramType}* %{param['id']}")
+
    #Iterate through blockList and translate instructions
    #for each block
    for block in blockList:
       if block.label != cfg.entry.label:
          llvmInstrs.append(f"LU{block.label}:")
+
+
       llvmInstrs.append("<PHI placeholder>")
       for instr in block.instrs:
          print(f"translating instruction: {instr}")
@@ -737,14 +817,19 @@ def lookupLlvmType(llvmType):
 
 def lookupParamTypes(params):
    paramTable = {}
+   printType = getPrintType()
    
    for param in params:
       paramTable[param['id']] = lookupLlvmType(param['type'])
 
    paramStrs = []
 
-   for param in params:
-      paramStrs.append(f"{paramTable[param['id']]} %{param['id']}")
+   if printType == "stack":
+      for param in params:
+         paramStrs.append(f"{paramTable[param['id']]} %_P_{param['id']}")
+   else:
+      for param in params:
+         paramStrs.append(f"{paramTable[param['id']]} %{param['id']}")
 
    formattedParamStr = ""
    for paramStr in paramStrs:
@@ -753,11 +838,13 @@ def lookupParamTypes(params):
    return formattedParamStr[:len(formattedParamStr) - 1]
 
 
-def translateProg(progCfg, globalSyms, structTypes, funTable):
+def translateProg(progCfg, globalSyms, structTypes, funTable, pType):
    #print(progCfg.funcCfgs)
    global funcTable
    progFuncs = {}
    funcTable = funTable
+
+   setPrintType(pType)
    
    for cfg in progCfg.funcCfgs:
       #progFuncs.add(cfg.funcName, funcLlvm(cfg))
