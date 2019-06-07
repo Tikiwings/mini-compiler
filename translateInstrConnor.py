@@ -44,6 +44,13 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls,
    instrStmt = instr["stmt"]
 
    if instrStmt == "assign":
+      # Check if read expression
+      if instr['source']['exp'] == 'read' and milestone2:
+         llvmInstrList.append("call i32 (i8*, ...)* @scanf(i8* getelementptr " +
+                              "inbounds([4 x i8]* @.read, i32 0, i32 0), " +
+                              f"i32* %{instr['target']['id']})")
+         return
+
       ###################################################
       # translate source
       sourceReg = getExpReg(instr["source"], llvmInstrList, mapping, 
@@ -56,9 +63,11 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls,
       if "left" in instr["target"]: # store source in struct field
          targetType = lookupLlvmType(instr["target"], decls, types, currBlock)
          targetReg = getStructFieldReg(llvmInstrList, mapping, currBlock,
-                                       instr["target"], decls, types,
+                                       instr["target"], decls, types, False,
                                        milestone2)
-         
+         #if sourceReg == None:
+         #   print(f"&&&Connor.transInst: sourceReg is None for instr:\n   {instr}")
+
          llvmInstrList.append(f"store {targetType} {sourceReg}, " +
                               f"{targetType}* {targetReg}")
       else: # update block declarations
@@ -172,8 +181,9 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
          #TODO: if problems with null, refer here
          loadToReg = f"%u{llvmTranslator.getNextRegLabel()}"
          exprType = lookupLlvmType(expr, decls, types, currBlock)
-         loadFromReg = llvmTranslator.lookupLabelDecl(currBlock, expr['id'])
-         llvmInstrList.append(f"{loadToReg} = load {exprType}* {loadFromReg}")
+         #loadFromReg = llvmTranslator.lookupLabelDecl(currBlock, expr['id'])
+         llvmInstrList.append(f"{loadToReg} = load {exprType}* %{expr['id']}")
+         #llvmInstrList.append(f"{loadToReg} = load {exprType}* {loadFromReg}")
 
          return loadToReg
       else:
@@ -268,7 +278,7 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
    elif expr["exp"] == "dot":
       # TODO: If problem with dot expressions, refer here
       structPtrReg = getStructFieldReg(llvmInstrList, mapping, currBlock,
-                                       expr, decls, types)
+                                       expr, decls, types, False, milestone2)
       resultReg = loadFromStructField(llvmInstrList, 
                             lookupLlvmType(expr, decls, types, currBlock),
                             structPtrReg)
@@ -341,7 +351,7 @@ def lookupStructType(target, decls, types, currBlock):
 
 
 def getStructFieldReg(llvmInstrList, mapping, currBlock, target, decls, types,
-                      withLoad = False):
+                      withLoad, milestone2):
    leftStructType = lookupStructType(target["left"], decls, types, currBlock)
    leftStructLlvmType = lookupLlvmType(target["left"], decls, types, currBlock)
    rightLlvmType = lookupLlvmType(target, decls, types, currBlock)
@@ -349,12 +359,14 @@ def getStructFieldReg(llvmInstrList, mapping, currBlock, target, decls, types,
    if "left" in target["left"]:
       if withLoad:
          tmpFieldReg = getStructFieldReg(llvmInstrList, mapping, currBlock,
-                                         target, decls, types)
+                                         target, decls, types, False,
+                                         milestone2)
          fieldReg = loadFromStructField(llvmInstrList, rightLlvmType,
                                         tmpFieldReg)
       else:
          tmpFieldReg = getStructFieldReg(llvmInstrList, mapping, currBlock,
-                                         target["left"], decls, types, True)
+                                         target["left"], decls, types, True,
+                                         milestone2)
          fieldReg = f"%u{llvmTranslator.getNextRegLabel()}"
          
          # get field number
@@ -367,7 +379,9 @@ def getStructFieldReg(llvmInstrList, mapping, currBlock, target, decls, types,
          if fieldNum == -1:
             print("&&&Connor.getStructFieldReg err: no type found for "+
                   f"expression: {target}\n   within types: {types}")
-
+         
+         if tmpFieldReg == None:
+            print(f"&&&Conn.getStructFieldReg None tmpFieldReg in if else")
          llvmInstrList.append(f"{fieldReg} = getelementptr " +
                               f"{leftStructLlvmType} " +
                               f"{tmpFieldReg}, " +
@@ -376,7 +390,8 @@ def getStructFieldReg(llvmInstrList, mapping, currBlock, target, decls, types,
    else:
       if withLoad:
          tmpfieldReg = getStructFieldReg(llvmInstrList, mapping, currBlock,
-                                         target, decls, types)
+                                         target, decls, types, False,
+                                         milestone2)
          fieldReg = loadFromStructField(llvmInstrList, rightLlvmType, 
                                         tmpfieldReg)
       else:
@@ -392,9 +407,17 @@ def getStructFieldReg(llvmInstrList, mapping, currBlock, target, decls, types,
          if fieldNum == -1:
             print("&&&Connor.getStructFieldReg err: no type found for "+
                   f"expression: {target}\n   within types: {types}")
-
-         structReg = llvmTranslator.lookupLabelDecl(currBlock, 
-                                                    target['left']['id'])
+         
+         structReg = -1
+         if milestone2:
+            structReg = f"%u{llvmTranslator.getNextRegLabel()}"
+            llvmInstrList.append(f"{structReg} = load {leftStructLlvmType}* " +
+                                 f"%{target['left']['id']}")
+         else:
+            structReg = llvmTranslator.lookupLabelDecl(currBlock, 
+                                                       target['left']['id'])
+         if structReg == None:
+            print(f"&&&Conn.getStructFieldReg None structReg in else else")
          llvmInstrList.append(f"{fieldReg} = getelementptr " +
                               f"{leftStructLlvmType} " +
                               f"{structReg}, i1 0, i32 {fieldNum}")
