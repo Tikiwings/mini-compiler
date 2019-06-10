@@ -187,7 +187,7 @@ def addBlock(body, currBlock, exit, cfgExit, label):
          
          # assess instructions inside Then branch
          labelCount = addBlock([stmt["then"]], thenEntry, thenExit, cfgExit,
-               labelCount + 2)
+                               labelCount + 2)
          
          # create Join Block aka Exit Node for if statement
          joinBlock = BlockNode(labelCount, "IfElseJoin")
@@ -223,36 +223,31 @@ def addBlock(body, currBlock, exit, cfgExit, label):
          # add guard expression to current block
          currBlock.instrs.append({"guard" : stmt["guard"]})
 
-         whileBlock = BlockNode(labelCount, "While")
-         joinBlock = BlockNode(labelCount + 1, "WhileJoin")
+         whileEntry = BlockNode(labelCount, "WhileEntry")
+         whileExit = BlockNode(labelCount + 1, "WhileExit")
+         joinBlock = BlockNode(labelCount + 2, "WhileJoin")
 
          # update succrs for current block
-         currBlock.succrs.append(whileBlock)
+         currBlock.succrs.append(whileEntry)
          currBlock.succrs.append(joinBlock)
-         whileBlock.preds.append(currBlock)
-         #whileBlock.succrs.append(whileBlock)
-         #whileBlock.succrs.append(joinBlock)
-         labelCount = addBlock([stmt["body"]], whileBlock, joinBlock, cfgExit,
-               labelCount + 2)
+         whileEntry.preds.append(currBlock)
          
-         # add guard at end of while block to determine which successor follows
-         whileBlock.instrs.append({"guard" : stmt["guard"]})
+         # add blocks for body of while loop
+         labelCount = addBlock([stmt["body"]], whileEntry, whileExit, cfgExit,
+                               labelCount + 3)
+         
+         # add guard at end of join block to determine which successor follows
+         whileExit.instrs.append({"guard" : stmt["guard"]})
 
-         # update predecessors
-         #joinBlock.preds.append(currBlock)
-         whileBlock.preds.append(whileBlock)
-
-         # first successor of while block will be what follows if the guard
-         #   is true. Second successor follows if guard is false.
-         #   Therefore, make whileBlock its FIRST successor.
-         whileBlock.succrs = [whileBlock] + whileBlock.succrs
-
-         # remove excess successors
-         if len(whileBlock.succrs) > 2:
-            whileBlock.succrs = whileBlock.succrs[:2]
+         # update preds/succrs
+         whileEntry.preds.append(whileExit)
+         whileExit.succrs.append(whileEntry)
+         whileExit.succrs.append(joinBlock)
+         joinBlock.preds.append(whileExit)
+         joinBlock.preds.append(currBlock)
 
          # resume adding instructions to the join block on next iteration 
-         #    of for loop.
+         #    of for loop of THIS program, not the while loop of CFG
          currBlock = joinBlock
       elif stmtType == "block":
          # add instructions from block statement into the current block
@@ -274,3 +269,4 @@ def addBlock(body, currBlock, exit, cfgExit, label):
 
 def printIndent(indentDepth):
    print("|  " * (indentDepth - 1), end = "")
+
