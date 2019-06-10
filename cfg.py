@@ -238,15 +238,19 @@ def addBlock(body, currBlock, exit, cfgExit, label):
          # add guard at end of while block to determine which successor follows
          whileBlock.instrs.append({"guard" : stmt["guard"]})
 
-         # update preds&succrs
-         joinBlock.preds.append(currBlock)
+         # update predecessors
+         #joinBlock.preds.append(currBlock)
          whileBlock.preds.append(whileBlock)
 
          # first successor of while block will be what follows if the guard
          #   is true. Second successor follows if guard is false.
          #   Therefore, make whileBlock its FIRST successor.
          whileBlock.succrs = [whileBlock] + whileBlock.succrs
-     
+
+         # remove excess successors
+         if len(whileBlock.succrs) > 2:
+            whileBlock.succrs = whileBlock.succrs[:2]
+
          # resume adding instructions to the join block on next iteration 
          #    of for loop.
          currBlock = joinBlock
