@@ -182,6 +182,8 @@ def transArith(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg):
             lhs = lookupLabelDecl(block, lhsInstr['id'], instrType = "i32")
       if negation:
          lhs = "-" + lhs
+   elif lhsType == "invocation":
+      lhs = translateInstr(instr['lft'], block, llvmInstrs, globals_and_locals, structTypes, cfg)
          
 
 
@@ -208,6 +210,8 @@ def transArith(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg):
             rhs = lookupLabelDecl(block, rhsInstr['id'], instrType = "i32")
       if negation:
          rhs = "-" + rhs
+   elif rhsType == "invocation":
+      rhs = translateInstr(instr['rht'], block, llvmInstrs, globals_and_locals, structTypes, cfg)
 
 
    #lookupLabelDecl(label, leftOp)
