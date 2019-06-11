@@ -95,8 +95,11 @@ def visited(label):
    global visitedBlocks
    return label in visitedBlocks
 
-def getFuncSymType(funcId, varId):
+def getFuncSymType(funcId, varId, globalSym = False):
    global funcSymTable
+   if globalSym == True:
+      if funcSymTable["__global__"].get(varId):
+         return funcSymTable["__global__"][varId].get('type')
    if funcSymTable[funcId].get(varId):
       return funcSymTable[funcId][varId].get('type')
    return None
@@ -119,11 +122,17 @@ def addfunSymTable(funcId, syms):
    global funcSymTable
    funcSymTable[funcId] = syms
 
-def addFuncSymEntry(funcId, symName, sym):
+def addFuncSymEntry(funcId, symName, sym, globalSym = False):
    global funcSymTable
+   if globalSym == True:
+      if not funcSymTable.get("__global__"):
+         funcSymTable["__global__"] = dict()
+      funcSymTable["__global__"][symName] = sym
+      return
    if not funcSymTable.get(funcId):
       funcSymTable[funcId] = dict()
    funcSymTable[funcId][symName] = sym
+   return
 
 def setPrintType(pType):
    global printType
@@ -143,7 +152,11 @@ def loadVar(funcId, varName, llvmInstrs):
 
    loadType = lookupLlvmType(getFuncSymType(funcId, varName))
 
-   llvmInstrs.append(f"%u{loadReg} = load {loadType}* %{varName}")
+   if loadType:
+      llvmInstrs.append(f"%u{loadReg} = load {loadType}* %{varName}")
+   else:
+      loadType = lookupLlvmType(getFuncSymType(funcId, varName, globalSym = True))
+      llvmInstrs.append(f"%u{loadReg} = load {loadType}* @{varName}")
 
    return f"%u{loadReg}"
 
@@ -735,7 +748,7 @@ def translateInstrs(cfg, globals_and_locals, structTypes):
    print(f"%%%%%%%%%%%%%%%GLOBALS_AND_LOCALS: {globals_and_locals}")
    for var in globals_and_locals:
       initVar(cfg.entry.label, var)
-      addFuncSymEntry(cfg.funcName, var, globals_and_locals[var])
+      #addFuncSymEntry(cfg.funcName, var, globals_and_locals[var])
    for param in cfg.params:
       #addLabelDecl(cfg.entry.label, param['id'], param['id'] )
       addLabelDecl(cfg.entry.label, param['id'], "%" + param['id'] )
@@ -876,8 +889,13 @@ def translateProg(progCfg, globalSyms, structTypes, funTable, pType):
 
    setPrintType(pType)
    
+   for sym in globalSyms:
+      addFuncSymEntry(None, sym, globalSyms[sym], globalSym = True)
+
    for cfg in progCfg.funcCfgs:
       #progFuncs.add(cfg.funcName, funcLlvm(cfg))
+      for sym, entry in combineDict(declListToDict(cfg.localDecls), declListToDict(cfg.params)).items():
+         addFuncSymEntry(cfg.funcName, sym, entry)
       progFuncs[cfg.funcName] = funcLlvm(cfg, globalSyms, structTypes)
 
    return progFuncs

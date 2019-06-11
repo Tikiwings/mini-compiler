@@ -237,11 +237,13 @@ def transGlobals(globals):
    
    for var in globals:
       globType = var['type']
-      if globType == "int" or globType == "bool":
-         globTypeStr = "i32*"
+      if globType == "int":
+         globStrs.append(f"@{var['id']} = common global i32 0, align 4")
+      elif globType == "bool":
+         globStrs.append(f"@{var['id']} = common global i1 false, align 4")
       else:
          globTypeStr = f"%struct.{globType}*"
-      globStrs.append(f"@{var['id']} = common global {globTypeStr} null, align 4")
+         globStrs.append(f"@{var['id']} = common global {globTypeStr} null, align 4")
 
    return globStrs
 
@@ -268,6 +270,7 @@ def transStructs(structs):
 
 
 def main():
+   instructionCount = 0
    symTable = {"__global__" : {}}
    structTable = {}
    funTable = {}
@@ -302,27 +305,27 @@ def main():
          funTable,
          getPrintType())
 
-   print("#####################################")
-   print("###########Llvm Prog#################")
-   print("#####################################")
+   #print("#####################################")
+   #print("###########Llvm Prog#################")
+   #print("#####################################")
    #print(f"Writing to {llvmFileName}")
    #print(f"Choices with {fileName}: {re.search('(.*)[.]*.*', fileName).groups()}")
    llvmFile = open(llvmFileName, "w+")
 
    #LLvm header, struct definitions, and globals
-   print("target triple=\"i686\"")
+   #print("target triple=\"i686\"")
    llvmFile.write("target triple=\"i686\"\n")
    for str in transStructs(progFile['types']):
-      print(str)
+      #print(str)
       llvmFile.write(str + "\n")
    for str in transGlobals(progFile['declarations']):
-      print(str)
+      #print(str)
       llvmFile.write(str + "\n")
 
    #LLvm instructions translation
    for func in progFuncs.keys():
-      print(f"define {progFuncs[func].retType} @{progFuncs[func].funcId}({progFuncs[func].params})")
-      print("{")
+      #print(f"define {progFuncs[func].retType} @{progFuncs[func].funcId}({progFuncs[func].params})")
+      #print("{")
       llvmFile.write(f"define {progFuncs[func].retType} @{progFuncs[func].funcId}({progFuncs[func].params})\n")
       llvmFile.write("{\n")
       curLabel = None
@@ -334,25 +337,29 @@ def main():
             #print(f"    <PHI placeholder found>")
             phiInstrs = handlePhi(curLabel, func)
             for phi in phiInstrs:
-               print(f"    {phi}")
+               #print(f"    {phi}")
                llvmFile.write(f"    {phi}\n")
+               instructionCount += 1
          else:
             if instr[0] == 'L':
-               print(instr)
+               #print(instr)
                llvmFile.write(instr + "\n")
             else:
-               print(f"    {instr}")
+               #print(f"    {instr}")
                llvmFile.write(f"    {instr}\n")
-      print("}\n")
+               instructionCount += 1
+      #print("}\n")
       llvmFile.write("}\n")
-   print(f"""declare i8* @malloc(i32)
+   """
+   print(f\"\"\"declare i8* @malloc(i32)
 declare void @free(i8*)
 declare i32 @printf(i8*, ...)
 declare i32 @scanf(i8*, ...)
 @.println = private unnamed_addr constant [5 x i8] c"%ld\\0A\\00", align 1
 @.print = private unnamed_addr constant [5 x i8] c"%ld \\00", align 1
 @.read = private unnamed_addr constant [4 x i8] c"%ld\\00", align 1
-@.read_scratch = common global i32 0, align 4""")
+@.read_scratch = common global i32 0, align 4\"\"\")
+   """
    llvmFile.write(f"""declare i8* @malloc(i32)
 declare void @free(i8*)
 declare i32 @printf(i8*, ...)
@@ -361,14 +368,18 @@ declare i32 @scanf(i8*, ...)
 @.print = private unnamed_addr constant [5 x i8] c"%ld \\00", align 1
 @.read = private unnamed_addr constant [4 x i8] c"%ld\\00", align 1
 @.read_scratch = common global i32 0, align 4\n""")
-   print(f"All Decls {getAllLabelDeclTables()}")
-   print(f"Phi Decls {getAllLabelDeclTables().get('incPhis')}")
+   #print(f"All Decls {getAllLabelDeclTables()}")
+   #print(f"Phi Decls {getAllLabelDeclTables().get('incPhis')}")
    ''' for x,y in progFile.items():
       for p in progFile[x]:
          print(p)
       print("=======================================================")
    '''
    llvmFile.close()
+   print("###########################################")
+   print(f"\tInstruction Count: {instructionCount}")
+   print("###########################################")
+
    return 0 
 
 if __name__ == "__main__":
