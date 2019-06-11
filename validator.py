@@ -271,6 +271,8 @@ def transStructs(structs):
 
 def main():
    instructionCount = 0
+   loadCount = 0
+   storeCount = 0
    symTable = {"__global__" : {}}
    structTable = {}
    funTable = {}
@@ -348,6 +350,11 @@ def main():
                #print(f"    {instr}")
                llvmFile.write(f"    {instr}\n")
                instructionCount += 1
+               if "load" in instr:
+                  loadCount += 1
+               elif "store" in instr:
+                  storeCount += 1
+
       #print("}\n")
       llvmFile.write("}\n")
    """
@@ -377,7 +384,9 @@ declare i32 @scanf(i8*, ...)
    '''
    llvmFile.close()
    print("###########################################")
-   print(f"\tInstruction Count: {instructionCount}")
+   print(f"\tInstruction Count: \t{instructionCount}")
+   print(f"\tStore Count: \t\t{storeCount}")
+   print(f"\tLoad Count: \t\t{loadCount}")
    print("###########################################")
 
    return 0 
