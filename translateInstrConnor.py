@@ -4,9 +4,10 @@ import llvmTranslator
 # types -- the list of types declared at the beginning of the json file
 # decls -- the list of global and local declarations for the function
 def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls, 
-               funcCfg, milestone2 = False):
+               funcCfg, funcTable, milestone2 = False):
    #print(f"&&&Connor.transInstr: decls:\n   {decls}")
-   
+   print(f"&&&Connor.transInstr funcTypes: {funcTypes}")
+
    # Insert return instruction if at the cfg exit block
    if len(currBlock.succrs) == 0:
       #TODO: Ask Donnie if he handles void return statements
@@ -175,7 +176,9 @@ def transBrInstr(guard, llvmInstrList, currBlock, idToRegMap, decls, types,
 def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
               milestone2 = False):
    resultReg = ""
-   
+  
+   #print(f"&&&Translating Expr: {expr}")
+
    if expr["exp"] == "id":  # identifier
       if milestone2:
          #TODO: if problems with null, refer here
@@ -192,6 +195,10 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
       return expr["value"] 
    if expr["exp"] == "null":
       return 'null'
+   if expr["exp"] == "true":
+      return "1"
+   if expr["exp"] == "false":
+      return "0"
    if expr["exp"] == "unary":  # operator is only '-'
       negatant = getExpReg(expr["operand"], llvmInstrList, mapping, currBlock,
                            decls, types, cfg, milestone2)
@@ -208,8 +215,6 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
    elif expr["exp"] == "binary":  # binary expr with a left and right side
       resultReg = f"%u{llvmTranslator.getNextRegLabel()}"
       llvmInstr = resultReg + " = "
-
-      #print(f"&&&Connor.getExpReg: translating expr:\n   {expr}")
 
       operator = expr["operator"]
       if operator == "<=":
@@ -299,10 +304,15 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
 
 
 def lookupLlvmType(target, decls, types, currBlock):
-   if "exp" in target and target["exp"] == "null":
-      return None
-   #if target['exp'] == 'num':
-   #   return 'i32'
+   print(f"&&&Looking up llvmType of {target}")
+   
+   if "exp" in target:
+      expr = target['exp']
+      if expr == 'null':
+         return None
+      if expr == 'num':
+         return 'i32'
+
 
    miniType = lookupStructType(target, decls, types, currBlock)
   
@@ -315,7 +325,9 @@ def lookupLlvmType(target, decls, types, currBlock):
 
 
 def convertLlvmType(miniType):
-   if miniType == "int" or miniType == "bool":
+   if miniType == "int":
+      return "i32"
+   if miniType == "bool":
       return "i32"
    elif miniType == "void":
       return "void"
