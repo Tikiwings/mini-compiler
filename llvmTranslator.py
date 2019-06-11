@@ -510,7 +510,7 @@ def translateInstr(instr, block, llvmInstrs, globals_and_locals, structTypes, cf
                structTypes,
                globals_and_locals,
                cfg,
-               declListToDict(getFuncTable()),
+               getFuncTable(),
                milestone2 = True) 
       else:
          return translateInstrConnor.transInstr(
@@ -521,7 +521,7 @@ def translateInstr(instr, block, llvmInstrs, globals_and_locals, structTypes, cf
                structTypes,
                globals_and_locals,
                cfg,
-               declListToDict(getFuncTable())) 
+               getFuncTable()) 
    """
    elif instrType == "boolean":
       pass
