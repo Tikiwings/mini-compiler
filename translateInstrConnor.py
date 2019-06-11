@@ -6,7 +6,7 @@ import llvmTranslator
 def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls, 
                funcCfg, funcTable, milestone2 = False):
    #print(f"&&&Connor.transInstr: decls:\n   {decls}")
-   print(f"&&&Connor.transInstr funcTypes: {funcTypes}")
+   print(f"&&&Connor.transInstr funcTypes: {funcTable}")
 
    # Insert return instruction if at the cfg exit block
    if len(currBlock.succrs) == 0:
