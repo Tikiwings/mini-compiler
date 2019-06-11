@@ -102,6 +102,9 @@ def getFuncSymType(funcId, varId, globalSym = False):
          return funcSymTable["__global__"][varId].get('type')
    if funcSymTable[funcId].get(varId):
       return funcSymTable[funcId][varId].get('type')
+   elif funcSymTable['__global__'].get(varId):
+      return funcSymTable['__global__'][varId].get('type')
+      #return None
    return None
 
 def getPrintType():
@@ -507,7 +510,7 @@ def translateInstr(instr, block, llvmInstrs, globals_and_locals, structTypes, cf
                structTypes,
                globals_and_locals,
                cfg,
-               getFuncTable(),
+               declListToDict(getFuncTable()),
                milestone2 = True) 
       else:
          return translateInstrConnor.transInstr(
@@ -518,7 +521,7 @@ def translateInstr(instr, block, llvmInstrs, globals_and_locals, structTypes, cf
                structTypes,
                globals_and_locals,
                cfg,
-               getFuncTable()) 
+               declListToDict(getFuncTable())) 
    """
    elif instrType == "boolean":
       pass
