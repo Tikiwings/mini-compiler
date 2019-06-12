@@ -6,11 +6,9 @@ import llvmTranslator
 def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls, 
                funcCfg, funcTable, milestone2 = False):
    #print(f"&&&Connor.transInstr: decls:\n   {decls}")
-   print(f"&&&Connor.transInstr funcTypes: {funcTable}")
 
    # Insert return instruction if at the cfg exit block
    if len(currBlock.succrs) == 0:
-      #TODO: Ask Donnie if he handles void return statements
       if funcCfg.returnType == "void":
          #llvmInstrList.append("ret void")
          pass
@@ -29,17 +27,17 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls,
    # check if guard for if/else or while statement
    if "guard" in instr:
       transBrInstr(instr["guard"], llvmInstrList, currBlock, mapping, 
-                   decls, types, funcCfg, milestone2)
+                   decls, types, funcCfg, funcTable, milestone2)
       # Break out of guard translation
       return
     
    ###################################################
    # Not a guard expression
   
-   # Check if passed an expression
+   # Translate EXPRESSION if it is one
    if "stmt" not in instr:
       return getExpReg(instr, llvmInstrList, mapping, currBlock, decls, types,
-                       funcCfg, milestone2)
+                       funcCfg, funcTable, milestone2)
 
    # Translate STATEMENT
    instrStmt = instr["stmt"]
@@ -54,18 +52,20 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls,
 
       ###################################################
       # translate source
-      sourceReg = getExpReg(instr["source"], llvmInstrList, mapping, 
-                            currBlock, decls, types, funcCfg, milestone2)
+      sourceReg = getExpReg(instr["source"], llvmInstrList, mapping, currBlock,
+                            decls, types, funcCfg, funcTable, milestone2)
 
       ###################################################
       # translate target
-      targetType = lookupLlvmType(instr["target"], decls, types, currBlock)
+      targetType = lookupLlvmType(instr["target"], decls, types, currBlock,
+                                  funcTable)
 
       if "left" in instr["target"]: # store source in struct field
-         targetType = lookupLlvmType(instr["target"], decls, types, currBlock)
+         targetType = lookupLlvmType(instr["target"], decls, types, currBlock,
+                                     funcTable)
          targetReg = getStructFieldReg(llvmInstrList, mapping, currBlock,
                                        instr["target"], decls, types, False,
-                                       milestone2)
+                                       funcTable, milestone2)
          #if sourceReg == None:
          #   print(f"&&&Connor.transInst: sourceReg is None for instr:\n   {instr}")
 
@@ -83,9 +83,10 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls,
                                         sourceReg)
 
    elif instrStmt == "delete":
-      sourceReg = getExpReg(instr["exp"], llvmInstrList, mapping, 
-                            currBlock, decls, types, funcCfg, milestone2)
-      sourceType = lookupLlvmType(instr["exp"], decls, types, currBlock)
+      sourceReg = getExpReg(instr["exp"], llvmInstrList, mapping, currBlock,
+                            decls, types, funcCfg, funcTable, milestone2)
+      sourceType = lookupLlvmType(instr["exp"], decls, types, currBlock,
+                                  funcTable)
       bitcastReg = f"%u{llvmTranslator.getNextRegLabel()}"
       
       llvmInstrList.append(bitcastReg + f" = bitcast {sourceType} " +
@@ -95,7 +96,8 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls,
       if "exp" in instr:
          #sourceType = lookupLlvmType(instr["exp"], decls, types)
          sourceReg = getExpReg(instr["exp"], llvmInstrList, mapping,
-                               currBlock, decls, types, funcCfg, milestone2)
+                               currBlock, decls, types, funcCfg, funcTable,
+                               milestone2)
          if milestone2:
             retType = convertLlvmType(funcCfg.returnType)
             storeInstr = f"store {retType} {sourceReg}, {retType}* %_retval_"
@@ -110,15 +112,12 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls,
          exitBlock = exitBlock.succrs[0]
 
       # Add the return statement to the Exit block to remind the translator
-      # that it must be translated. 
-      # TODO: I'm hoping this will also work with the phi instructions.
-      # Depending on how phi instructions are handled, this may need changing
-      
+      #    that it must be translated. 
       if len(exitBlock.instrs) == 0:
          exitBlock.instrs.append(instr)
    elif instrStmt == "print":
       sourceReg = getExpReg(instr["exp"], llvmInstrList, mapping, currBlock,
-                            decls, types, funcCfg, milestone2)
+                            decls, types, funcCfg, funcTable, milestone2)
 
       # Start off the print instruction
       printInstr = ("call i32 (i8*, ...)* @printf(i8* getelementptr " +
@@ -159,12 +158,12 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls,
 
 
 def transBrInstr(guard, llvmInstrList, currBlock, idToRegMap, decls, types,
-                 cfg, milestone2 = False):
+                 cfg, funcTable, milestone2 = False):
    if len(currBlock.succrs) < 2:
       print("&&&Connor.transBrInstr err: Cant evaluate branch instruction."+
             f"  Too few succrs to current block when evaluating guard {guard}")
    guardEvalReg = getExpReg(guard, llvmInstrList, idToRegMap, currBlock,
-                            decls, types, cfg, milestone2)
+                            decls, types, cfg, funcTable, milestone2)
    llvmInstrList.append(f"br i1 {guardEvalReg}, label "+
                         f"%LU{currBlock.succrs[0].label}, label "+
                         f"%LU{currBlock.succrs[1].label}")
@@ -174,7 +173,7 @@ def transBrInstr(guard, llvmInstrList, currBlock, idToRegMap, decls, types,
 #   immediate value
 # exp types: id, num, binary, new, dot, invocation, read, unary
 def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
-              milestone2 = False):
+              funcTable, milestone2 = False):
    resultReg = ""
   
    #print(f"&&&Translating Expr: {expr}")
@@ -183,7 +182,7 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
       if milestone2:
          #TODO: if problems with null, refer here
          loadToReg = f"%u{llvmTranslator.getNextRegLabel()}"
-         exprType = lookupLlvmType(expr, decls, types, currBlock)
+         exprType = lookupLlvmType(expr, decls, types, currBlock, funcTable)
          #loadFromReg = llvmTranslator.lookupLabelDecl(currBlock, expr['id'])
          llvmInstrList.append(f"{loadToReg} = load {exprType}* %{expr['id']}")
          #llvmInstrList.append(f"{loadToReg} = load {exprType}* {loadFromReg}")
@@ -201,7 +200,7 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
       return "0"
    if expr["exp"] == "unary":  # operator is only '-'
       negatant = getExpReg(expr["operand"], llvmInstrList, mapping, currBlock,
-                           decls, types, cfg, milestone2)
+                           decls, types, cfg, funcTable, milestone2)
       resultReg = f"%u{llvmTranslator.getNextRegLabel()}"
       llvmInstr = resultReg + " = "
 
@@ -210,6 +209,9 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
          llvmInstr += f"sub i32 0, {negatant}"
       elif operator == "!":  # TODO: zext/trunc if type error
          llvmInstr += f"xor i1 true, {negatant}"
+      else:
+         print("&&&Connor.getExpReg ERROR: unaccounted unary operator: " +
+               f"'{operator}' in expression:\n   {expr}")
 
       llvmInstrList.append(llvmInstr)
    elif expr["exp"] == "binary":  # binary expr with a left and right side
@@ -226,17 +228,21 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
       elif operator == "<":
          llvmInstr += "icmp slt i32 "
       elif operator == "==":
-         operandType = lookupLlvmType(expr['lft'], decls, types, currBlock)
+         operandType = lookupLlvmType(expr['lft'], decls, types, currBlock,
+                                      funcTable)
          if operandType == None:
-            operandType = lookupLlvmType(expr['rht'], decls, types, currBlock)
+            operandType = lookupLlvmType(expr['rht'], decls, types, currBlock,
+                                         funcTable)
             if operandType == None:
                print("&&&Connor.getExpReg: No type for either operand in expr:\n"+
                      f"   {expr}")      
          llvmInstr += f"icmp eq {operandType} "
       elif operator == "!=":
-         operandType = lookupLlvmType(expr['lft'], decls, types, currBlock)
+         operandType = lookupLlvmType(expr['lft'], decls, types, currBlock,
+                                      funcTable)
          if operandType == None:
-            operandType = lookupLlvmType(expr['rht'], decls, types, currBlock)
+            operandType = lookupLlvmType(expr['rht'], decls, types, currBlock,
+                                         funcTable)
             if operandType == None:
                print("&&&Connor.getExpReg: No type for either operand in expr:\n"+
                      f"   {expr}")
@@ -258,9 +264,9 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
          print(f"   in expression: {expr}")
 
       leftSide = getExpReg(expr["lft"], llvmInstrList, mapping, currBlock,
-                           decls, types, cfg, milestone2)
+                           decls, types, cfg, funcTable, milestone2)
       rightSide = getExpReg(expr["rht"], llvmInstrList, mapping, currBlock,
-                            decls, types, cfg, milestone2)
+                            decls, types, cfg, funcTable, milestone2)
       llvmInstr += f"{leftSide}, {rightSide}"
       llvmInstrList.append(llvmInstr)
    elif expr["exp"] == "new":
@@ -283,10 +289,11 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
    elif expr["exp"] == "dot":
       # TODO: If problem with dot expressions, refer here
       structPtrReg = getStructFieldReg(llvmInstrList, mapping, currBlock,
-                                       expr, decls, types, False, milestone2)
+                                       expr, decls, types, False, funcTable,
+                                       milestone2)
       resultReg = loadFromStructField(llvmInstrList, 
-                            lookupLlvmType(expr, decls, types, currBlock),
-                            structPtrReg)
+                            lookupLlvmType(expr, decls, types, currBlock,
+                                           funcTable), structPtrReg)
    elif expr["exp"] == "invocation":
       resultReg = llvmTranslator.translateInstr(expr, currBlock,
                                     llvmInstrList, decls, types, cfg)
@@ -303,7 +310,7 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
    return resultReg
 
 
-def lookupLlvmType(target, decls, types, currBlock):
+def lookupLlvmType(target, decls, types, currBlock, funcTable):
    print(f"&&&Looking up llvmType of {target}")
    
    if "exp" in target:
@@ -312,7 +319,27 @@ def lookupLlvmType(target, decls, types, currBlock):
          return None
       if expr == 'num':
          return 'i32'
-
+      elif expr == 'invocation':
+         return funcTable[target['id']]['return_type']
+      elif expr == 'true' or expr == 'false':
+         #TODO: If problems with bool types, refer here
+         return 'i1'
+      elif expr == 'unary':
+         if target['operator'] == '-':
+            return 'i32'
+         # else operator == '!'
+         return 'i1'
+      elif expr == 'binary':
+         operator = target['operator']
+         
+         if (operator == '-' or operator == '+' or operator == '*' or
+             operator == '*'):
+            return 'i32'
+         # else operator is <, >, <=, >=, ==, !=, &&, or ||
+         return 'i1'
+      elif expr == 'new':
+         return f"%struct.{target['id']}*"
+      # else pass on if expression is 'dot', 'id'
 
    miniType = lookupStructType(target, decls, types, currBlock)
   
@@ -363,22 +390,23 @@ def lookupStructType(target, decls, types, currBlock):
 
 
 def getStructFieldReg(llvmInstrList, mapping, currBlock, target, decls, types,
-                      withLoad, milestone2):
+                      withLoad, funcTable, milestone2):
    leftStructType = lookupStructType(target["left"], decls, types, currBlock)
-   leftStructLlvmType = lookupLlvmType(target["left"], decls, types, currBlock)
-   rightLlvmType = lookupLlvmType(target, decls, types, currBlock)
+   leftStructLlvmType = lookupLlvmType(target["left"], decls, types, currBlock,
+                                       funcTable)
+   rightLlvmType = lookupLlvmType(target, decls, types, currBlock, funcTable)
    fieldReg = ""
    if "left" in target["left"]:
       if withLoad:
          tmpFieldReg = getStructFieldReg(llvmInstrList, mapping, currBlock,
                                          target, decls, types, False,
-                                         milestone2)
+                                         funcTable, milestone2)
          fieldReg = loadFromStructField(llvmInstrList, rightLlvmType,
                                         tmpFieldReg)
       else:
          tmpFieldReg = getStructFieldReg(llvmInstrList, mapping, currBlock,
                                          target["left"], decls, types, True,
-                                         milestone2)
+                                         funcTable, milestone2)
          fieldReg = f"%u{llvmTranslator.getNextRegLabel()}"
          
          # get field number
@@ -403,7 +431,7 @@ def getStructFieldReg(llvmInstrList, mapping, currBlock, target, decls, types,
       if withLoad:
          tmpfieldReg = getStructFieldReg(llvmInstrList, mapping, currBlock,
                                          target, decls, types, False,
-                                         milestone2)
+                                         funcTable, milestone2)
          fieldReg = loadFromStructField(llvmInstrList, rightLlvmType, 
                                         tmpfieldReg)
       else:
