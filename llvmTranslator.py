@@ -107,7 +107,7 @@ def getFuncSymType(funcId, varId, globalSym = False):
       #return None
    return None
 
-def isGlobal(varName):
+def isGlobal(varId):
    global funcSymTable
    if funcSymTable[getCurFunc()].get(varId):
       return False
