@@ -173,7 +173,7 @@ def addBlock(body, currBlock, exit, cfgExit, label):
 
          # ignore code after return statement
          return labelCount
-      elif stmtType == "if":
+      if stmtType == "if":
          
          # add guard expression to current block
          currBlock.instrs.append({"guard" : stmt["guard"]})
