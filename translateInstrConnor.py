@@ -355,7 +355,7 @@ def convertLlvmType(miniType):
    if miniType == "int":
       return "i32"
    if miniType == "bool":
-      return "i32"
+      return "i1"
    elif miniType == "void":
       return "void"
    elif miniType == None:
