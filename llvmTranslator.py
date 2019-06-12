@@ -164,12 +164,21 @@ def loadVar(funcId, varName, llvmInstrs):
    loadReg = getNextRegLabel()
 
    loadType = lookupLlvmType(getFuncSymType(funcId, varName))
-
+   
+   """
    if loadType:
       llvmInstrs.append(f"%u{loadReg} = load {loadType}* %{varName}")
    else:
       loadType = lookupLlvmType(getFuncSymType(funcId, varName, globalSym = True))
       llvmInstrs.append(f"%u{loadReg} = load {loadType}* @{varName}")
+   """
+
+   if not isGlobal(varName):
+      llvmInstrs.append(f"%u{loadReg} = load {loadType}* %{varName}")
+   else:
+      loadType = lookupLlvmType(getFuncSymType(funcId, varName, globalSym = True))
+      llvmInstrs.append(f"%u{loadReg} = load {loadType}* @{varName}")
+
 
    return f"%u{loadReg}"
 
