@@ -258,8 +258,10 @@ def transStructs(structs):
       for field in struct['fields']:
          fieldType = field['type']
 
-         if fieldType == "int" or fieldType == "bool":
+         if fieldType == "int": 
             structStr += "i32, "
+         elif fieldType == "bool":
+            structStr += "i1, "
          else:
             structStr += f"%struct.{fieldType}*, "
       structStr = structStr[:-2] + "}"
