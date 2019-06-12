@@ -1,11 +1,10 @@
 import llvmTranslator
 
-# mapping -- a dictionary that maps string to int. Used to map identifiers to registers
 # types -- the list of types declared at the beginning of the json file
 # decls -- the list of global and local declarations for the function
 def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls, 
                funcCfg, funcTable, milestone2 = False):
-   #print(f"&&&Connor.transInstr: decls:\n   {decls}")
+   print(f"&&&Connor.transInstr: decls:\n   {decls}")
 
    # Insert return instruction if at the cfg exit block
    if len(currBlock.succrs) == 0:
@@ -45,9 +44,18 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls,
    if instrStmt == "assign":
       # Check if read expression
       if instr['source']['exp'] == 'read' and milestone2:
-         llvmInstrList.append("call i32 (i8*, ...)* @scanf(i8* getelementptr " +
-                              "inbounds([4 x i8]* @.read, i32 0, i32 0), " +
-                              f"i32* %{instr['target']['id']})")
+         readInstr = ("call i32 (i8*, ...)* @scanf(i8* getelementptr " +
+                      "inbounds([4 x i8]* @.read, i32 0, i32 0), i32* ")
+         if llvmTranslator.isGlobal(instr['target']['id']):
+            readInstr += "@"
+         else:
+            readInstr += "%"
+         readInstr += instr['target']['id'] + ")"
+
+         llvmInstrList.append(readInstr)
+         #llvmInstrList.append("call i32 (i8*, ...)* @scanf(i8* getelementptr " +
+         #                     "inbounds([4 x i8]* @.read, i32 0, i32 0), " +
+         #                     f"i32* %{instr['target']['id']})")
          return
 
       ###################################################
@@ -66,8 +74,9 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls,
          targetReg = getStructFieldReg(llvmInstrList, mapping, currBlock,
                                        instr["target"], decls, types, False,
                                        funcTable, milestone2)
-         #if sourceReg == None:
-         #   print(f"&&&Connor.transInst: sourceReg is None for instr:\n   {instr}")
+         if sourceReg == None:
+            print("&&&Connor.transInst: sourceReg is None for instr:" +
+                  f"\n   {instr}")
 
          llvmInstrList.append(f"store {targetType} {sourceReg}, " +
                               f"{targetType}* {targetReg}")
@@ -77,8 +86,18 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls,
          if milestone2:
             storeInstr = (f"store {targetType} {sourceReg}, {targetType}* " +
                           f"%{targetId}")
+            
+            storeInstr = f"store {targetType} {sourceReg}, {targetType}* "
+            if llvmTranslator.isGlobal(targetId):
+               storeInstr += "@"
+            else:
+               storeInstr += "%"
+            storeInstr += targetId
+            
             llvmInstrList.append(storeInstr)
          else:
+            print(f"&&&Assign instr: Updating declaration '{targetId}'" +
+                  f" with register {sourceReg}")
             llvmTranslator.addLabelDecl(currBlock.label, targetId, 
                                         sourceReg)
 
@@ -183,9 +202,15 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
          #TODO: if problems with null, refer here
          loadToReg = f"%u{llvmTranslator.getNextRegLabel()}"
          exprType = lookupLlvmType(expr, decls, types, currBlock, funcTable)
-         #loadFromReg = llvmTranslator.lookupLabelDecl(currBlock, expr['id'])
-         llvmInstrList.append(f"{loadToReg} = load {exprType}* %{expr['id']}")
-         #llvmInstrList.append(f"{loadToReg} = load {exprType}* {loadFromReg}")
+         
+         loadInstr = f"{loadToReg} = load {exprType}* "
+         if llvmTranslator.isGlobal(expr['id']):
+            loadInstr += "@"
+         else:
+            loadInstr += "%"
+         loadInstr += expr['id']
+         
+         llvmInstrList.append(loadInstr)
 
          return loadToReg
       else:
@@ -297,6 +322,8 @@ def getExpReg(expr, llvmInstrList, mapping, currBlock, decls, types, cfg,
    elif expr["exp"] == "invocation":
       resultReg = llvmTranslator.translateInstr(expr, currBlock,
                                     llvmInstrList, decls, types, cfg)
+      #print(f"&&&Result register of invocation expression: {resultReg}")
+      #print(f"&&&Expression used: {expr}")
    elif expr["exp"] == "read":
       llvmInstrList.append("call i32 (i8*, ...)* @scanf(i8* getelementptr " +
                            "inbounds([4 x i8]* @.read, i32 0, i32 0), " +
@@ -451,8 +478,15 @@ def getStructFieldReg(llvmInstrList, mapping, currBlock, target, decls, types,
          structReg = -1
          if milestone2:
             structReg = f"%u{llvmTranslator.getNextRegLabel()}"
-            llvmInstrList.append(f"{structReg} = load {leftStructLlvmType}* " +
-                                 f"%{target['left']['id']}")
+            
+            loadInstr = f"{structReg} = load {leftStructLlvmType}* "
+            if llvmTranslator.isGlobal(target['left']['id']):
+               loadInstr += "@"
+            else:
+               loadInstr += "%"
+            loadInstr += target['left']['id']
+
+            llvmInstrList.append(loadInstr)
          else:
             structReg = llvmTranslator.lookupLabelDecl(currBlock, 
                                                        target['left']['id'])
