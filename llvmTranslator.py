@@ -107,6 +107,16 @@ def getFuncSymType(funcId, varId, globalSym = False):
       #return None
    return None
 
+def isGlobal(varName):
+   global funcSymTable
+   if funcSymTable[getCurFunc()].get(varId):
+      return False
+   elif funcSymTable['__global__'].get(varId):
+      return True
+   else:
+      return False
+
+
 def getPrintType():
    global printType
    return printType
@@ -357,6 +367,7 @@ def transInvoc(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg):
       return None
    elif invocRetType == "int":
       llvmInstrs.append(f"%u{resultReg} = call i32 @{instr['id']}({paramStr})")
+      return f"%u{resultReg}"
    elif invocRetType == "bool":
       llvmInstrs.append(f"%u{resultReg} = call i1 @{instr['id']}({paramStr})")
       return f"%u{resultReg}"
