@@ -334,6 +334,10 @@ def transInvoc(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg):
          elif instr['args'][i]['exp'] == 'dot':
             #paramTypes[i] = lookupLabelDecl(getDotType(instr, globals_and_locals, structTypes))
             paramTypes[i] = lookupLlvmType(translateInstrConnor.lookupStructType(instr['args'][i], globals_and_locals, structTypes, block))
+         elif instr['args'][i]['exp'] == 'null':
+            paramTypes[i] = lookupLlvmType(getFuncTable()[getCurFunc()]['parameters'][i]['type'])
+
+
          else:
             paramTypes[i] = 'i32'
 
@@ -600,7 +604,7 @@ def handlePhi(label, funcId):
 
    if labelDecls.get(label):
       if labelDecls[label].get("incPhis"):
-         print(labelDecls[label]["incPhis"])
+         print(f"Looking at Label: {label} inc phis: {labelDecls[label]['incPhis']}")
          for phiReg in labelDecls[label]["incPhis"]:
             #print(phiInstr)
             #phiStr = f"%u{phiReg} = phi {labelDecls[label]['incPhis'][phiReg]['type']} "
@@ -614,6 +618,7 @@ def handlePhi(label, funcId):
                      #phiStr += f"[{param['reg']}, %LU{param['label']}],"
                      phiStr += f"[{param['reg']}, %LU{pred.label}],"
                if not alreadyComputed:
+                  print("Lookup starting from handler")
                   sourceReg = lookupLabelDecl(pred, labelDecls[label]["incPhis"][phiReg]['varName'], phiLabelLoc) 
                   #phiStr += f"[{sourceReg}, %LU{phiLabelLoc[0]}],"
                   phiStr += f"[{sourceReg}, %LU{pred.label}],"
@@ -649,7 +654,7 @@ def lookupLabelDecl(label, varName):
 """
 
 #""" #replacement lookup
-
+#TODO fix phi's with bools to be i1
 def lookupLabelDecl(block, varName, phiLabelLoc = None, phiHandler = False, instrType = None):
    global labelDecls
    print(f"looking for {varName} in {block.label}")
@@ -692,14 +697,15 @@ def lookupLabelDecl(block, varName, phiLabelLoc = None, phiHandler = False, inst
 
       preds = block.preds
       for pred in preds:
-         print(f"Looking for {varName} in pred label {pred.label}... visited: {pred.visited}")
+         print(f"Looking for {varName} in pred label {pred.label}... visited: {visited(pred.label)}")
          if visited(pred.label):
             phiLabel = [None]
-            lookupReg = lookupLabelDecl(pred, varName, phiLabel, instrType = instrType)
+            lookupReg = lookupLabelDecl(pred, varName, phiLabelLoc = phiLabel, instrType = instrType)
             labelDecls[block.label]['incPhis'][phiReg]['params'].append({
                "reg": lookupReg, 
                "label":phiLabel[0], 
                "startLabel" : pred.label})
+            print(f"Phi entry: {labelDecls[block.label]['incPhis'][phiReg]}")
 
          """
          else:
@@ -856,7 +862,7 @@ def lookupLlvmType(llvmType):
    if llvmType == "int":
       return "i32"
    elif llvmType == "bool":
-      return "i32"
+      return "i1"
    elif llvmType == "void":
       return "void"
    else:

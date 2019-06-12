@@ -324,6 +324,14 @@ def main():
       #print(str)
       llvmFile.write(str + "\n")
 
+   for func in progFuncs.keys():
+      for instr in progFuncs[func].instrs:
+         labels = re.findall("\ALU[1234567890]*:", instr.strip())
+         if len(labels) >= 1:
+            curLabel = int(labels[0][2:-1])
+         if instr == "<PHI placeholder>":
+            handlePhi(curLabel, func)
+
    #LLvm instructions translation
    for func in progFuncs.keys():
       #print(f"define {progFuncs[func].retType} @{progFuncs[func].funcId}({progFuncs[func].params})")
