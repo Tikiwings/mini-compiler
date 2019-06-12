@@ -107,6 +107,7 @@ def getFuncSymType(funcId, varId, globalSym = False):
       #return None
    return None
 
+
 def isGlobal(varId):
    global funcSymTable
    if funcSymTable[getCurFunc()].get(varId):
@@ -697,6 +698,8 @@ def lookupLabelDecl(block, varName, phiLabelLoc = None, phiHandler = False, inst
    elif len(block.preds) == 0:
       if phiLabelLoc:
          phiLabelLoc[0] = None
+      if isGlobal(varName):
+         return f"@{varName}"
       return None
 
    elif len(block.preds) == 1:
