@@ -353,7 +353,7 @@ def lookupLlvmType(target, decls, types, currBlock, funcTable):
       if expr == 'num':
          return 'i32'
       elif expr == 'invocation':
-         return funcTable[target['id']]['return_type']
+         return convertLlvmType(funcTable[target['id']]['return_type'])
       elif expr == 'true' or expr == 'false':
          #TODO: If problems with bool types, refer here
          return 'i1'
@@ -497,7 +497,8 @@ def getStructFieldReg(llvmInstrList, mapping, currBlock, target, decls, types,
             structReg = llvmTranslator.lookupLabelDecl(currBlock, 
                                                        target['left']['id'])
          if structReg == None:
-            print(f"&&&Conn.getStructFieldReg None structReg in else else")
+            print(f"&&&Connor.getStructFieldReg None structReg in else else")
+            print(f"   Decls: {decls}")
          llvmInstrList.append(f"{fieldReg} = getelementptr " +
                               f"{leftStructLlvmType} " +
                               f"{structReg}, i1 0, i32 {fieldNum}")
