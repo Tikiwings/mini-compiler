@@ -327,7 +327,7 @@ def transInvoc(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg):
       else:
          #paramRegs[i] = getNextRegLabel()
          paramRegs[i] = translateInstr(instr['args'][i], block, llvmInstrs, globals_and_locals, structTypes, cfg)
-         paramTypes[i] = lookupLlvmType(getFuncTable()[getCurFunc()]['parameters'][i]['type'])
+         paramTypes[i] = lookupLlvmType(getFuncTable()[instr['id']]['parameters'][i]['type'])
          """
          if instr['args'][i]['exp'] == 'id':
             paramTypes[i] = lookupLlvmType(getFuncSymType(getCurFunc(), instr['args'][i]['id']))
