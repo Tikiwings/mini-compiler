@@ -355,8 +355,10 @@ def transInvoc(instr, block, llvmInstrs, globals_and_locals, structTypes, cfg):
    if invocRetType == "void":
       llvmInstrs.append(f"call {invocRetType} @{instr['id']}({paramStr})")
       return None
-   elif invocRetType == "int" or invocRetType == "bool":
+   elif invocRetType == "int":
       llvmInstrs.append(f"%u{resultReg} = call i32 @{instr['id']}({paramStr})")
+   elif invocRetType == "bool":
+      llvmInstrs.append(f"%u{resultReg} = call i1 @{instr['id']}({paramStr})")
       return f"%u{resultReg}"
    else:
       llvmInstrs.append(f"%u{resultReg} = call %struct.{invocRetType}* @{instr['id']}({paramStr})")
