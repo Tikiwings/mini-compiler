@@ -46,11 +46,17 @@ def transInstr(instr, llvmInstrList, currBlock, mapping, types, decls,
       if instr['source']['exp'] == 'read' and milestone2:
          readInstr = ("call i32 (i8*, ...)* @scanf(i8* getelementptr " +
                       "inbounds([4 x i8]* @.read, i32 0, i32 0), i32* ")
-         if llvmTranslator.isGlobal(instr['target']['id']):
-            readInstr += "@"
+         
+         targetReg = instr['target']['id']
+         if 'left' in instr['target']:
+            targetReg = getStructFieldReg(llvmInstrList, mapping, currBlock,
+                 instr['target'], decls, types, False, funcTable, True)
          else:
-            readInstr += "%"
-         readInstr += instr['target']['id'] + ")"
+            if llvmTranslator.isGlobal(instr['target']['id']):
+               readInstr += "@"
+            else:
+               readInstr += "%"
+         readInstr += targetReg + ")"
 
          llvmInstrList.append(readInstr)
          #llvmInstrList.append("call i32 (i8*, ...)* @scanf(i8* getelementptr " +
