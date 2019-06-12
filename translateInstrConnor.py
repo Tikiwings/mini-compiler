@@ -333,7 +333,7 @@ def lookupLlvmType(target, decls, types, currBlock, funcTable):
          operator = target['operator']
          
          if (operator == '-' or operator == '+' or operator == '*' or
-             operator == '*'):
+             operator == '/'):
             return 'i32'
          # else operator is <, >, <=, >=, ==, !=, &&, or ||
          return 'i1'
