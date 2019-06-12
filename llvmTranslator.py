@@ -111,8 +111,9 @@ def isGlobal(varId):
    global funcSymTable
    if funcSymTable[getCurFunc()].get(varId):
       return False
-   elif funcSymTable['__global__'].get(varId):
-      return True
+   elif funcSymTable.get('__global__'):
+      if funcSymTable['__global__'].get(varId):
+         return True
    else:
       return False
 
