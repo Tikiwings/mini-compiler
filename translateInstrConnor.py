@@ -466,11 +466,18 @@ def getStructFieldReg(llvmInstrList, mapping, currBlock, target, decls, types,
          else:
             structReg = llvmTranslator.lookupLabelDecl(currBlock, 
                                                        target['left']['id'])
+            if structReg[:1] == '@':
+               oldStructReg = structReg
+               structReg = f"%u{llvmTranslator.getNextRegLabel()}"
+               llvmInstrList.append(f"{structReg} = load {leftStructLlvmType}"+
+                                    f"* {oldStructReg}")
+
          if structReg == None:
-            print(f"&&&Connor.getStructFieldReg None structReg in else else")
-            print(f"   when trying to look up '{target['left']['id']}'")
-            print(f"   LabelDeclTable: {llvmTranslator.getLabelDeclTable(currBlock.label)}")
+            #print(f"&&&Connor.getStructFieldReg None structReg in else else")
+            #print(f"   when trying to look up '{target['left']['id']}'")
+            #print(f"   LabelDeclTable: {llvmTranslator.getLabelDeclTable(currBlock.label)}")
             structReg = f"%{target['left']['id']}"
+         
          llvmInstrList.append(f"{fieldReg} = getelementptr " +
                               f"{leftStructLlvmType} " +
                               f"{structReg}, i1 0, i32 {fieldNum}")
